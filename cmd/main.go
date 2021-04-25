@@ -6,12 +6,16 @@ import (
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
 	"github.com/dave/dst/dstutil"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"go/ast"
 	"go/build"
 	"go/parser"
 	"go/token"
+	"io/ioutil"
 	"log"
-	"os"
+	"net/http"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -26,7 +30,40 @@ func init() {
 }
 
 func main() {
-	run()
+	//run()
+	//diff()
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("hey buddy"))
+	})
+	r.Get("/listTests/{pkg}", handleTests)
+	http.ListenAndServe(":3000", r)
+}
+
+func handleTests(w http.ResponseWriter, r *http.Request) {
+	pkg := chi.URLParam(r, "pkg")
+	cmd := exec.Command("go", "test", pkg, "-list", ".*")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	fatalIf(err)
+	output := strings.Split(out.String(), "\n")
+	tests := filterToTests(output)
+
+	w.Write([]byte(strings.Join(tests, ", ")))
+}
+
+
+func diff() {
+	text1 := "Lorem ipsum dolor."
+	text2 := "Lorem dolor sit amet."
+
+	dmp := diffmatchpatch.New()
+
+	diffs := dmp.DiffMain(text1, text2, false)
+
+	fmt.Println(dmp.DiffPrettyText(diffs))
 }
 
 func fatalIf(err error) {
@@ -183,18 +220,43 @@ func run() {
 	output := strings.Split(out.String(), "\n")
 	tests := filterToTests(output)
 
-	fmt.Println("Available Tests: ", tests)
-	profiles, err := generateProfiles(pkg, []string{tests[1]})
+	fmt.Println("Available Rests: ", tests)
+	activeTests := []string{}
+	previousFileVersion := ""
 
-	files := getStrippedFiles(profiles)
-	for name, tree := range files {
-		r := decorator.NewRestorer()
-		fmt.Println("File: ", name)
-		err = r.Fprint(os.Stdout, tree)
+	for _, test := range tests {
+		fmt.Println("Adding test: ", test)
+		fmt.Println("------------------------")
+		activeTests = append(activeTests, test)
+		profiles, err := generateProfiles(pkg, activeTests)
 		fatalIf(err)
-		fmt.Println("")
+
+		files := getStrippedFiles(profiles)
+		for name, tree := range files {
+			if name != "commitlog/simple/simple.go" {
+				continue
+			}
+
+			var buf bytes.Buffer
+			dmp := diffmatchpatch.New()
+			r := decorator.NewRestorer()
+			err = r.Fprint(&buf, tree)
+
+			newVersion := buf.String()
+			diffs := dmp.DiffMain(previousFileVersion, newVersion, false)
+			fmt.Println(dmp.DiffPrettyText(diffs))
+
+			previousFileVersion = newVersion
+		}
 	}
 
+	fullFileData, err := ioutil.ReadFile("../simple/simple.go")
 	fatalIf(err)
+	dmp := diffmatchpatch.New()
+	diffs := dmp.DiffMain(previousFileVersion, string(fullFileData), false)
+	if len(diffs) != 0 {
+		fmt.Println("Uncovered code ----------")
+		fmt.Println(dmp.DiffPrettyText(diffs))
+	}
 }
 
