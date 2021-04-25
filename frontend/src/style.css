@@ -1,3 +1,17 @@
-.hello {
-    color: red;
+.Page {
+    display: flex;
+}
+
+.Tests {
+    display: flex;
+    flex-direction: column;
+}
+
+.Tests button.is-active {
+    background-color: blue;
+}
+
+.Files {
+    border: 1px solid black;
+    flex-grow: 1;
 }

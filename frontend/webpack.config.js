@@ -2,7 +2,7 @@ import HtmlWebpackPlugin from 'html-webpack-plugin';
 
 const config = {
     mode: 'development',
-    entry: './src/index.js',
+    entry: './src/index.tsx',
     devServer: {
       contentBase: './dist',
     },
@@ -14,10 +14,16 @@ const config = {
     plugins: [
         new HtmlWebpackPlugin({
             title: 'Commit Logs',
+            template: 'src/index.html',
         }),
     ],
     module: {
         rules: [
+            {
+                test: /\.tsx?$/,
+                use: 'ts-loader',
+                exclude: /node_modules/,
+            },
             {
                 test: /\.css$/i,
                 use: ['style-loader', 'css-loader'],
@@ -27,6 +33,9 @@ const config = {
                 type: 'asset/resource',
             },
         ],
+    },
+    resolve: {
+        extensions: ['.tsx', '.ts', '.js'],
     },
 }
 

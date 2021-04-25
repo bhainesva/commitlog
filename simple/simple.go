@@ -3,8 +3,8 @@ package simple
 import "fmt"
 
 type Wow struct {
-	Hi int // Comment
-	Bye int // Comment
+	Hi    int    // Comment
+	Bye   int    // Comment
 	Hello string // Comment
 }
 
@@ -14,10 +14,9 @@ func Print(w Wow) {
 }
 
 // Check checks the wow
-func Check (w Wow) bool {
+func Check(w Wow) bool {
 	fmt.Println(w.Hello)
 
 	// The magic
 	return w.Bye > 29
 }
-

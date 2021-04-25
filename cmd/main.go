@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
 	"github.com/dave/dst/dstutil"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"go/ast"
 	"go/build"
@@ -34,36 +36,68 @@ func main() {
 	//diff()
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"https://*", "http://*"},
+		AllowedMethods: []string{"GET", "POST"},
+		AllowedHeaders: []string{"Accept", "Content-Type"},
+	}))
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("hey buddy"))
 	})
-	r.Get("/listTests/{pkg}", handleTests)
+
+	r.Get("/listTests", handleTests)
+	r.Post("/listFiles", handleFiles)
 	http.ListenAndServe(":3000", r)
 }
 
+type filesRequest struct {
+	Tests []string `json:"tests,omitempty"`
+	Pkg   string   `json:"pkg,omitempty"`
+}
+
+func handleFiles(w http.ResponseWriter, r *http.Request) {
+	var req filesRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fileContents, err := runWithInfo(req.Pkg, req.Tests)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	js, err := json.Marshal(fileContents)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Write(js)
+}
+
 func handleTests(w http.ResponseWriter, r *http.Request) {
-	pkg := chi.URLParam(r, "pkg")
+	pkg := r.URL.Query().Get("pkg")
 	cmd := exec.Command("go", "test", pkg, "-list", ".*")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
-	fatalIf(err)
+	log.Println("args: ", cmd.Args)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		log.Print(cmd.Stderr)
+	}
 	output := strings.Split(out.String(), "\n")
 	tests := filterToTests(output)
+	js, err := json.Marshal(tests)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+	}
 
-	w.Write([]byte(strings.Join(tests, ", ")))
-}
-
-
-func diff() {
-	text1 := "Lorem ipsum dolor."
-	text2 := "Lorem dolor sit amet."
-
-	dmp := diffmatchpatch.New()
-
-	diffs := dmp.DiffMain(text1, text2, false)
-
-	fmt.Println(dmp.DiffPrettyText(diffs))
+	w.Write(js)
 }
 
 func fatalIf(err error) {
@@ -75,7 +109,7 @@ func fatalIf(err error) {
 func filterToTests(ss []string) []string {
 	var out []string
 	for _, s := range ss {
-		if s != "" && len(strings.Fields(s)) == 1 {
+		if s != "" && len(strings.Fields(s)) == 1 && strings.HasPrefix(s, "Test") {
 			out = append(out, s)
 		}
 	}
@@ -135,8 +169,8 @@ func getAstByDst(m decorator.Map, node dst.Node) ast.Node {
 	return nil
 }
 
-func pre(fset *token.FileSet, profile *cover.Profile, m decorator.Map) func (cursor *dstutil.Cursor) bool {
-	return func (cursor *dstutil.Cursor) bool  {
+func pre(fset *token.FileSet, profile *cover.Profile, m decorator.Map) func(cursor *dstutil.Cursor) bool {
+	return func(cursor *dstutil.Cursor) bool {
 		node := cursor.Node()
 		astNode := getAstByDst(m, node)
 		if node == nil || astNode == nil {
@@ -157,11 +191,11 @@ func pre(fset *token.FileSet, profile *cover.Profile, m decorator.Map) func (cur
 	}
 }
 
-func post (cursor *dstutil.Cursor) bool {
+func post(cursor *dstutil.Cursor) bool {
 	if cursor.Node() == nil {
 		return true
 	}
-	if _, ok := toDDelete[cursor.Node()]; ok{
+	if _, ok := toDDelete[cursor.Node()]; ok {
 		if cursor.Index() >= 0 {
 			cursor.Delete()
 			return true
@@ -187,7 +221,7 @@ func getStrippedFile(profile *cover.Profile) *dst.File {
 
 	fset := token.NewFileSet()
 	d := decorator.NewDecorator(fset)
-	f, err := d.ParseFile( p, nil, parser.ParseComments)
+	f, err := d.ParseFile(p, nil, parser.ParseComments)
 	fatalIf(err)
 
 	newtree := dstutil.Apply(f, pre(fset, profile, d.Map), post).(*dst.File)
@@ -207,6 +241,55 @@ func generateProfiles(pkg string, tests []string) ([]*cover.Profile, error) {
 	}
 
 	return profiles, nil
+}
+
+func runWithInfo(pkg string, tests []string) ([]map[string][]byte, error) {
+	out := make([]map[string][]byte, len(tests)+1)
+	finalContentsMap := map[string][]byte{}
+
+	activeTests := []string{}
+
+	log.Printf("Calculating diffs for %s, test order: %v", pkg, tests)
+
+	for i, test := range tests {
+		log.Printf("Adding test: ", test)
+		contentsMap := map[string][]byte{}
+
+		activeTests = append(activeTests, test)
+		profiles, err := generateProfiles(pkg, activeTests)
+		if err != nil {
+			return nil, err
+		}
+
+		files := getStrippedFiles(profiles)
+		for name, tree := range files {
+			var buf bytes.Buffer
+			r := decorator.NewRestorer()
+			err = r.Fprint(&buf, tree)
+			if err != nil {
+				return nil, err
+			}
+
+			contentsMap[name] = buf.Bytes()
+
+			if _, ok := finalContentsMap[name]; !ok {
+				fn, err := findFile(name)
+				if err != nil {
+					return nil, err
+				}
+
+				fullFileData, err := ioutil.ReadFile(fn)
+				if err != nil {
+					return nil, err
+				}
+				finalContentsMap[name] = fullFileData
+			}
+		}
+
+		out[i] = contentsMap
+	}
+	out[len(tests)] = finalContentsMap
+	return out, nil
 }
 
 func run() {
@@ -259,4 +342,3 @@ func run() {
 		fmt.Println(dmp.DiffPrettyText(diffs))
 	}
 }
-
