@@ -57,14 +57,14 @@ export default function App() {
             newValue={atob(content)}
             splitView={false}
             leftTitle={name}
-            showDiffOnly={false}
+            showDiffOnly={Object.keys(contents).length > 1 ? true : false}
             renderContent={highlightSyntax}
           />
         </div>
       )
     }
 
-    return <div>{out}</div>
+    return out
   }
 
   async function handleSubmit(pkg: string) {

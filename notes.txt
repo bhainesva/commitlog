@@ -1,8 +1,21 @@
+TODO:
+backend:
+only run converage for each test once. Combine the profiles in code instead of re-runnign the tests.
+algorithm to generate good test orders
+tmp files for coverage files / cleanup or something
+
+frontend:
+autocomplete for available packages
+error messages for missing package
+collapsible files
+allow test order to be customized
+
+
+Notes:
 thought just deleting uncovered lines would be enough but it wasn't because of how the weird { } cases
 work.
 
 there is something weird w/ dst
-
 	r := decorator.NewRestorer()
 	r.Fprint(fi, ntree)
 
