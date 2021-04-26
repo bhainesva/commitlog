@@ -1,6 +1,5 @@
 TODO:
 backend:
-only run converage for each test once. Combine the profiles in code instead of re-runnign the tests.
 algorithm to generate good test orders
 tmp files for coverage files / cleanup or something
 

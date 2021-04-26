@@ -7,6 +7,7 @@ require (
 	github.com/dave/dst v0.26.2
 	github.com/go-chi/chi/v5 v5.0.2
 	github.com/go-chi/cors v1.2.0
+	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/nbutton23/zxcvbn-go v0.0.0-20210217022336-fa2cb2858354 // indirect
 	github.com/sergi/go-diff v1.2.0
 	github.com/stretchr/testify v1.7.0 // indirect

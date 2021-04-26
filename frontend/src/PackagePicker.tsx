@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import * as R from 'ramda';
 import {useCombobox} from 'downshift'
 
 interface Props {
@@ -24,7 +25,8 @@ export default function PackagePicker(props: Props) {
       props.onSubmit(selectedItem);
     },
     onInputValueChange: ({inputValue}) => {
-      setFilteredPackages(inputValue.length < 2 ? [] : packages.filter(item => item.toLowerCase().startsWith(inputValue.toLowerCase())))
+      setFilteredPackages(inputValue.length < 2 ? [] : 
+        R.take(10, packages.filter(item => item.toLowerCase().includes(inputValue.toLowerCase()))))
     },
   })
 
@@ -47,7 +49,7 @@ export default function PackagePicker(props: Props) {
           props.onSubmit(inputValue)}
         }>
           <input type="text" {...getInputProps()} />
-          <ul {...getMenuProps()}>
+          <ul className="Autocomplete" {...getMenuProps()}>
             {isOpen &&
               filteredPackages.map((item, index) => (
                 <li

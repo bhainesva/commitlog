@@ -1,0 +1,41 @@
+*, *::after, *::before {
+    box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+    height: 100%;
+    margin: 0;
+}
+
+.Page {
+    display: flex;
+}
+
+.Tests {
+    display: flex;
+    flex-direction: column;
+}
+
+.Tests button.is-active {
+    background-color: aliceblue;
+}
+
+.Files {
+    border: 1px solid black;
+    flex-grow: 1;
+}
+
+.LandingPage {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.Autocomplete {
+    position: absolute;
+}
