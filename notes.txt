@@ -5,7 +5,6 @@ algorithm to generate good test orders
 tmp files for coverage files / cleanup or something
 
 frontend:
-autocomplete for available packages
 error messages for missing package
 collapsible files
 allow test order to be customized

@@ -53,6 +53,7 @@ func main() {
 
 	r.Get("/listTests", handleTests)
 	r.Post("/listFiles", handleFiles)
+	r.Get("/listPackages", handlePackages)
 	log.Println("Listening on port 3000...")
 	http.ListenAndServe(":3000", r)
 }
@@ -90,7 +91,6 @@ func handleTests(w http.ResponseWriter, r *http.Request) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
-	log.Println("args: ", cmd.Args)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -103,7 +103,25 @@ func handleTests(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 	}
+	w.Write(js)
+}
 
+func handlePackages(w http.ResponseWriter, r *http.Request) {
+	cmd := exec.Command("go", "list", "...")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		log.Print(cmd.Stderr)
+	}
+	output := strings.Split(out.String(), "\n")
+	js, err := json.Marshal(output)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+	}
 	w.Write(js)
 }
 

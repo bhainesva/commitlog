@@ -1,20 +1,66 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import {useCombobox} from 'downshift'
 
 interface Props {
   onSubmit: (pkg: string) => void
 }
 
 export default function PackagePicker(props: Props) {
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState('');
+  const [packages, setPackages] = useState([]);
+  const [filteredPackages, setFilteredPackages] = useState([]);
+
+  const {
+    isOpen,
+    inputValue,
+    getMenuProps,
+    getInputProps,
+    getComboboxProps,
+    highlightedIndex,
+    getItemProps,
+  } = useCombobox({
+    items: filteredPackages,
+    onSelectedItemChange: ({selectedItem}) => {
+      props.onSubmit(selectedItem);
+    },
+    onInputValueChange: ({inputValue}) => {
+      setFilteredPackages(inputValue.length < 2 ? [] : packages.filter(item => item.toLowerCase().startsWith(inputValue.toLowerCase())))
+    },
+  })
+
+  useEffect(() => {
+    fetchPackages().then((data) => {
+      setPackages(data)
+    })
+  }, [])
+
+  const fetchPackages = async () => {
+    return fetch('http://localhost:3000/listPackages')
+    .then(r => r.json())
+  }
 
   return (
-    <div>
+    <div {...getComboboxProps()}>
       <div>Pick a package</div> 
       <form onSubmit={(e) => {
           e.preventDefault();
-          props.onSubmit(value)}
+          props.onSubmit(inputValue)}
         }>
-        <input type="text" value={value} onChange={e => setValue(e.target.value)} />
+          <input type="text" {...getInputProps()} />
+          <ul {...getMenuProps()}>
+            {isOpen &&
+              filteredPackages.map((item, index) => (
+                <li
+                  style={
+                    highlightedIndex === index ? {backgroundColor: '#bde4ff'} : {}
+                  }
+                  key={`${item}${index}`}
+                  {...getItemProps({item, index})}
+                >
+                  {item}
+                </li>
+              ))}
+          </ul>
         <button>Go!</button>
       </form>
     </div>
