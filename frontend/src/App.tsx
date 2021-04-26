@@ -40,18 +40,14 @@ export default function App() {
 
   const filesView = () => {
     if (activeTest == -1) return 'Select a test to begin';
-    console.log("Active: ", activeTest);
     const previousContents = activeTest === 0 ? {} : files[activeTest - 1];
     const contents = files[activeTest];
-    console.log("contenst", contents);
 
     const out = [];
     for (const [name, content] of Object.entries(contents)) {
       const previousContent = previousContents[name] || '';
-      console.log("prev content: ", previousContent);
-      console.log("new content", content);
       out.push(
-        <div className="File">
+        <div key={name} className="File">
           <ReactDiffViewer
             oldValue={atob(previousContent)}
             newValue={atob(content)}

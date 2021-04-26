@@ -18,6 +18,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -25,10 +26,15 @@ import (
 	"golang.org/x/tools/cover"
 )
 
-var toDDelete map[dst.Node]struct{}
+var (
+	toDDelete map[dst.Node]struct{}
+	// pkg -> test name -> coverage profiles
+	coverageCache map[string]map[string][]*cover.Profile
+)
 
 func init() {
 	toDDelete = map[dst.Node]struct{}{}
+	coverageCache = map[string]map[string][]*cover.Profile{}
 }
 
 func main() {
@@ -47,6 +53,7 @@ func main() {
 
 	r.Get("/listTests", handleTests)
 	r.Post("/listFiles", handleFiles)
+	log.Println("Listening on port 3000...")
 	http.ListenAndServe(":3000", r)
 }
 
@@ -170,22 +177,45 @@ func getAstByDst(m decorator.Map, node dst.Node) ast.Node {
 }
 
 func mergeProfiles(profiles ...*cover.Profile) []*cover.Profile {
-	profileByFile := map[string]*cover.Profile{}
-	var out []*cover.Profile
+	type blockPos struct {
+		SCol, ECol, SLine, ELine int
+	}
+	profileByFiles := map[string][]*cover.Profile{}
 
 	for _, profile := range profiles {
-		if _, ok := profileByFile[profile.FileName]; !ok {
-			profileByFile[profile.FileName] = &cover.Profile{}
+		profileByFiles[profile.FileName] = append(profileByFiles[profile.FileName], profile)
+	}
+
+	var outProfiles []*cover.Profile
+
+	for file, fileProfiles := range profileByFiles {
+		blockByPos := map[blockPos]*cover.ProfileBlock{}
+		for _, profile := range fileProfiles {
+			for _, block := range profile.Blocks {
+				block := block
+				pos := blockPos{SCol: block.StartCol, ECol: block.EndCol, SLine: block.StartLine, ELine: block.EndLine}
+				if existingBlock, ok := blockByPos[pos]; ok {
+					if block.Count == 1 {
+						existingBlock.Count = 1
+					}
+				} else {
+					blockByPos[pos] = &block
+				}
+			}
 		}
-		base := profileByFile[profile.FileName]
-		base.Blocks = append(base.Blocks, profile.Blocks...)
+
+		var blocks []cover.ProfileBlock
+		for _, block := range blockByPos {
+			blocks = append(blocks, *block)
+		}
+
+		outProfiles = append(outProfiles, &cover.Profile{
+			FileName: file,
+			Blocks:   blocks,
+		})
 	}
 
-	for _, profile := range profileByFile {
-		out = append(out, profile)
-	}
-
-	return out
+	return outProfiles
 }
 
 func pre(fset *token.FileSet, profile *cover.Profile, m decorator.Map) func(cursor *dstutil.Cursor) bool {
@@ -223,28 +253,63 @@ func post(cursor *dstutil.Cursor) bool {
 	return true
 }
 
-func getStrippedFiles(profiles []*cover.Profile) map[string]*dst.File {
+func getStrippedFiles(profiles []*cover.Profile) (map[string]*dst.File, error) {
+	log.Println("Getting stripped files")
 	files := map[string]*dst.File{}
 
 	for _, profile := range profiles {
-		tree := getStrippedFile(profile)
+		tree, err := getStrippedFile(profile)
+		if err != nil {
+			return nil, err
+		}
 		files[profile.FileName] = tree
 	}
 
-	return files
+	return files, nil
 }
 
-func getStrippedFile(profile *cover.Profile) *dst.File {
+func getStrippedFile(profile *cover.Profile) (*dst.File, error) {
+	log.Println("Finding file: ", profile.FileName)
 	p, err := findFile(profile.FileName)
-	fatalIf(err)
+	if err != nil {
+		return nil, err
+	}
+	log.Println("Found at: ", p)
 
 	fset := token.NewFileSet()
 	d := decorator.NewDecorator(fset)
 	f, err := d.ParseFile(p, nil, parser.ParseComments)
-	fatalIf(err)
+	if err != nil {
+		return nil, err
+	}
 
 	newtree := dstutil.Apply(f, pre(fset, profile, d.Map), post).(*dst.File)
-	return newtree
+	return newtree, nil
+}
+
+func getTestProfile(pkg, test string) ([]*cover.Profile, error) {
+	log.Println("Getting profile for: ", pkg, test)
+	if testMap, ok := coverageCache[pkg]; ok {
+		if profiles, ok := testMap[test]; ok {
+			return profiles, nil
+		}
+	} else {
+		coverageCache[pkg] = map[string][]*cover.Profile{}
+	}
+	cmd := exec.Command("go", "test", pkg, "-run", "^" + test + "$", "--coverprofile=coverage.out")
+	err := cmd.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	profiles, err := cover.ParseProfiles("coverage.out")
+	if err != nil {
+		return nil, err
+	}
+	os.Remove("coverage.out")
+
+	coverageCache[pkg][test] = profiles
+	return profiles, nil
 }
 
 func generateProfiles(pkg string, tests []string) ([]*cover.Profile, error) {
@@ -266,21 +331,25 @@ func runWithInfo(pkg string, tests []string) ([]map[string][]byte, error) {
 	out := make([]map[string][]byte, len(tests)+1)
 	finalContentsMap := map[string][]byte{}
 
-	activeTests := []string{}
-
 	log.Printf("Calculating diffs for %s, test order: %v", pkg, tests)
 
-	for i, test := range tests {
-		log.Printf("Adding test: ", test)
-		contentsMap := map[string][]byte{}
+	var prevProfiles []*cover.Profile
 
-		activeTests = append(activeTests, test)
-		profiles, err := generateProfiles(pkg, test)
+	for i, test := range tests {
+		log.Println("Adding test: ", test)
+		profiles, err := getTestProfile(pkg, test)
 		if err != nil {
 			return nil, err
 		}
 
-		files := getStrippedFiles(profiles)
+		activeProfiles := mergeProfiles(append(prevProfiles, profiles...)...)
+
+		contentsMap := map[string][]byte{}
+
+		files, err := getStrippedFiles(activeProfiles)
+		if err != nil {
+			return nil, err
+		}
 		for name, tree := range files {
 			var buf bytes.Buffer
 			r := decorator.NewRestorer()
@@ -306,6 +375,7 @@ func runWithInfo(pkg string, tests []string) ([]map[string][]byte, error) {
 		}
 
 		out[i] = contentsMap
+		prevProfiles = activeProfiles
 	}
 	out[len(tests)] = finalContentsMap
 	return out, nil
@@ -333,7 +403,8 @@ func run() {
 		profiles, err := generateProfiles(pkg, activeTests)
 		fatalIf(err)
 
-		files := getStrippedFiles(profiles)
+		files, err := getStrippedFiles(profiles)
+		fatalIf(err)
 		for name, tree := range files {
 			if name != "commitlog/simple/simple.go" {
 				continue

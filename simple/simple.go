@@ -1,22 +1,37 @@
 package simple
 
-import "fmt"
+import "strings"
 
-type Wow struct {
-	Hi    int    // Comment
-	Bye   int    // Comment
-	Hello string // Comment
+type Person struct {
+	Name     string // This is their normal name
+	Nickname string // You can call them this
+	Title    string // It's their title
 }
 
-// Print prints the wow
-func Print(w Wow) {
-	fmt.Println("Hi,: ", w.Hi)
+// FormatCasual formats a person's name like they're your friend
+func FormatCasual(p Person) string {
+	nameToUse := p.Name
+
+	if p.Nickname != "" {
+		nameToUse = p.Nickname
+	}
+
+	return "Sup, " + nameToUse
 }
 
-// Check checks the wow
-func Check(w Wow) bool {
-	fmt.Println(w.Hello)
+// FormatProfessional formats a person's name very officially
+func FormatProfessional(p Person) string {
+	suffix := p.Name
+	if p.Title != "" {
+		suffix = p.Title + " " + suffix
+	}
 
-	// The magic
-	return w.Bye > 29
+	greeting := "Greetings, " + suffix
+
+	// Need to yell, they're far away
+	if p.Title == "Astronaut" {
+		greeting = strings.ToUpper(greeting)
+	}
+
+	return greeting
 }
