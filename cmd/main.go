@@ -169,6 +169,25 @@ func getAstByDst(m decorator.Map, node dst.Node) ast.Node {
 	return nil
 }
 
+func mergeProfiles(profiles ...*cover.Profile) []*cover.Profile {
+	profileByFile := map[string]*cover.Profile{}
+	var out []*cover.Profile
+
+	for _, profile := range profiles {
+		if _, ok := profileByFile[profile.FileName]; !ok {
+			profileByFile[profile.FileName] = &cover.Profile{}
+		}
+		base := profileByFile[profile.FileName]
+		base.Blocks = append(base.Blocks, profile.Blocks...)
+	}
+
+	for _, profile := range profileByFile {
+		out = append(out, profile)
+	}
+
+	return out
+}
+
 func pre(fset *token.FileSet, profile *cover.Profile, m decorator.Map) func(cursor *dstutil.Cursor) bool {
 	return func(cursor *dstutil.Cursor) bool {
 		node := cursor.Node()
@@ -256,7 +275,7 @@ func runWithInfo(pkg string, tests []string) ([]map[string][]byte, error) {
 		contentsMap := map[string][]byte{}
 
 		activeTests = append(activeTests, test)
-		profiles, err := generateProfiles(pkg, activeTests)
+		profiles, err := generateProfiles(pkg, test)
 		if err != nil {
 			return nil, err
 		}
