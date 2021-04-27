@@ -1,10 +1,9 @@
-import React, { useState, MouseEvent, useCallback, useRef, FC } from "react";
+import React, { useState } from "react";
 import PackagePicker from "./PackagePicker";
 import ReactDiffViewer from 'react-diff-viewer';
-import { DndProvider, DragPreviewImage, DropTargetMonitor, useDrop, XYCoord } from 'react-dnd'
+import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { DraggableList } from "./DraggableList"
-import update from 'immutability-helper'
 
 declare var Prism: any;
 
@@ -28,12 +27,13 @@ export default function App() {
       .then(r => r.json())
   }
 
-  const fetchFiles = async (pkg: string, testNames: string[]) => {
+  const fetchFiles = async (pkg: string, testNames: string[], sortType: string) => {
     return fetch('http://localhost:3000/listFiles', {
       method: 'POST',
       body: JSON.stringify({
         pkg,
         tests: testNames,
+        sort: sortType,
       })
     })
       .then(r => r.json())
@@ -56,9 +56,9 @@ export default function App() {
     const out = [];
     for (const [name, content] of Object.entries(contents)) {
       const previousContent = previousContents[name] || '';
-      console.log("nme: , name: ", name)
       out.push(
         <div key={name} className="File">
+          {/* <button onClick={() => console.log(name)} className="File-name">{name}</button> */}
           <ReactDiffViewer
             oldValue={atob(previousContent)}
             newValue={atob(content)}
@@ -82,8 +82,12 @@ export default function App() {
     setFiles([])
   }
 
-  async function handleGenerateLogs() {
-    fetchFiles(activePkg, tests).then(setFiles)
+  async function handleGenerateLogs(sortType: string) {
+    fetchFiles(activePkg, tests, sortType).then(data => {
+      console.log("got: ", data);
+      setTests(data.tests);
+      setFiles(data.files);
+    })
   }
 
   // Landing Page
@@ -106,7 +110,9 @@ export default function App() {
         <DndProvider backend={HTML5Backend}>
           <DraggableList setItems={setTests} items={tests} />
         </DndProvider>
-        <button onClick={handleGenerateLogs}>Generate Log</button>
+        <button onClick={() => handleGenerateLogs("")}>Generate with this order</button>
+        <button onClick={() => handleGenerateLogs("raw")}>Generate with tests sorted by raw lines covered</button>
+        <button onClick={() => handleGenerateLogs("net")}>Generate with tests sorted by net lines covered</button>
       </div>
     )
   }

@@ -9,12 +9,6 @@ import (
 	"strings"
 )
 
-type filesRequest struct {
-	Tests []string `json:"tests,omitempty"`
-	Pkg   string   `json:"pkg,omitempty"`
-	Sort   string   `json:"sort,omitempty"`
-}
-
 func filterToTests(ss []string) []string {
 	var out []string
 	for _, s := range ss {
@@ -66,6 +60,18 @@ func HandleTests(w http.ResponseWriter, r *http.Request) {
 	w.Write(js)
 }
 
+type filesRequest struct {
+	Tests []string `json:"tests,omitempty"`
+	Pkg   string   `json:"pkg,omitempty"`
+	Sort   string   `json:"sort,omitempty"`
+}
+
+type filesResponse struct {
+	Tests []string `json:"tests,omitempty"`
+	Files []map[string][]byte `json:"files,omitempty""`
+}
+
+
 func HandleFiles(w http.ResponseWriter, r *http.Request) {
 	var req filesRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -82,7 +88,7 @@ func HandleFiles(w http.ResponseWriter, r *http.Request) {
 		sortFunc = sortTestsByNewLinesCovered
 	}
 
-	fileContents, err := computeFileContentsByTest(computationConfig{
+	tests, fileContents, err := computeFileContentsByTest(computationConfig{
 		pkg:   req.Pkg,
 		tests: req.Tests,
 		sort: sortFunc,
@@ -91,7 +97,10 @@ func HandleFiles(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	js, err := json.Marshal(fileContents)
+	js, err := json.Marshal(filesResponse{
+		Tests: tests,
+		Files: fileContents,
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

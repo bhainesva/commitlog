@@ -97,12 +97,13 @@ func sortTestsByNewLinesCovered(testProfiles map[string][]*cover.Profile) []stri
 				minCoverageGain = coverageGain
 				minCoverage = newCoverage
 			}
+			fmt.Println(test, " adds: ", coverageGain)
 		}
 		sortedTests = append(sortedTests, tests[minTestIdx])
 		existingCoverage = minCoverage
 		tests = append(tests[:minTestIdx], tests[minTestIdx+1:]...)
 	}
-	return tests
+	return sortedTests
 }
 
 func sortHardcodedOrder(order []string) testSortingFunction {
@@ -173,16 +174,23 @@ func mergeProfiles(existingProfiles, newProfiles []*cover.Profile) ([]*cover.Pro
 	for file, fileProfiles := range profileByFiles {
 		blockByPos := map[blockPos]*cover.ProfileBlock{}
 		for _, profile := range fileProfiles {
+			profile := profile
 			for _, block := range profile.Blocks {
 				block := block
 				pos := blockPos{SCol: block.StartCol, ECol: block.EndCol, SLine: block.StartLine, ELine: block.EndLine}
 				if existingBlock, ok := blockByPos[pos]; ok {
 					if block.Count == 1 {
-						existingBlock.Count = 1
-						coverageGain += block.EndLine - block.StartLine
+						if existingBlock.Count == 1 {
+							coverageGain -= block.EndLine - block.StartLine
+						} else {
+							existingBlock.Count = 1
+						}
 					}
 				} else {
 					blockByPos[pos] = &block
+					if block.Count == 1 {
+						coverageGain += block.EndLine - block.StartLine
+					}
 				}
 			}
 		}
@@ -306,7 +314,7 @@ type computationConfig struct {
 // computeFileContentsByTest takes a package name and test ordering
 // and returns a map filename -> fileContents for each test, where the content
 // is what is covered by the tests up to that point in the ordering
-func computeFileContentsByTest(config computationConfig) ([]map[string][]byte, error) {
+func computeFileContentsByTest(config computationConfig) ([]string, []map[string][]byte, error) {
 	pkg := config.pkg
 	tests := config.tests
 
@@ -319,7 +327,7 @@ func computeFileContentsByTest(config computationConfig) ([]map[string][]byte, e
 	for _, test := range tests {
 		profiles, err := getTestProfile(pkg, test)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		profilesByTest[test] = profiles
@@ -335,14 +343,14 @@ func computeFileContentsByTest(config computationConfig) ([]map[string][]byte, e
 
 		files, err := getStrippedFiles(activeProfiles)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for name, tree := range files {
 			var buf bytes.Buffer
 			r := decorator.NewRestorer()
 			err = r.Fprint(&buf, tree)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			contentsMap[name] = buf.Bytes()
@@ -350,12 +358,12 @@ func computeFileContentsByTest(config computationConfig) ([]map[string][]byte, e
 			if _, ok := finalContentsMap[name]; !ok {
 				fn, err := findFile(name)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 
 				fullFileData, err := ioutil.ReadFile(fn)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 				finalContentsMap[name] = fullFileData
 			}
@@ -365,5 +373,5 @@ func computeFileContentsByTest(config computationConfig) ([]map[string][]byte, e
 		prevProfiles = activeProfiles
 	}
 	out[len(tests)] = finalContentsMap
-	return out, nil
+	return sortedTests, out, nil
 }
