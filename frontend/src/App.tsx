@@ -79,6 +79,7 @@ export default function App() {
     setActivePkg(pkg)
     const testNames = await fetchTestNames(pkg);
     setTests(testNames);
+    setFiles([])
   }
 
   async function handleGenerateLogs() {
