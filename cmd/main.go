@@ -315,7 +315,7 @@ func getTestProfile(pkg, test string) ([]*cover.Profile, error) {
 	} else {
 		coverageCache[pkg] = map[string][]*cover.Profile{}
 	}
-	cmd := exec.Command("go", "test", pkg, "-run", "^" + test + "$", "--coverprofile=coverage.out")
+	cmd := exec.Command("go", "test", pkg, "-run", "^"+test+"$", "--coverprofile=coverage.out")
 	err := cmd.Run()
 	if err != nil {
 		return nil, err

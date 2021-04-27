@@ -8,7 +8,7 @@ import (
 
 func TestMergeProfile(t *testing.T) {
 	p1 := cover.Profile{
-		Blocks:   []cover.ProfileBlock{
+		Blocks: []cover.ProfileBlock{
 			cover.ProfileBlock{
 				StartLine: 11,
 				StartCol:  0,
@@ -27,7 +27,7 @@ func TestMergeProfile(t *testing.T) {
 	}
 
 	p2 := cover.Profile{
-		Blocks:   []cover.ProfileBlock{
+		Blocks: []cover.ProfileBlock{
 			cover.ProfileBlock{
 				StartLine: 11,
 				StartCol:  0,
