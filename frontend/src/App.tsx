@@ -76,8 +76,8 @@ export default function App() {
 
 
   async function handleSubmit(pkg: string) {
-    setActivePkg(pkg)
     const testNames = await fetchTestNames(pkg);
+    setActivePkg(pkg)
     setTests(testNames);
     setFiles([])
   }

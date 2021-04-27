@@ -21,7 +21,7 @@ func filterToTests(ss []string) []string {
 }
 
 func HandlePackages(w http.ResponseWriter, r *http.Request) {
-	cmd := exec.Command("go", "list", "...")
+	cmd := exec.Command("go", "list", "./...")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
