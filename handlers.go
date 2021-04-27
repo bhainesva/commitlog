@@ -86,9 +86,11 @@ func HandleFiles(w http.ResponseWriter, r *http.Request) {
 		sortFunc = sortTestsByRawLinesCovered
 	} else if req.Sort == "net" {
 		sortFunc = sortTestsByNewLinesCovered
-	}
+	} else if req.Sort == "importance" {
+sortFunc = sortTestsByImportance
+}
 
-	tests, fileContents, err := computeFileContentsByTest(computationConfig{
+tests, fileContents, err := computeFileContentsByTest(computationConfig{
 		pkg:   req.Pkg,
 		tests: req.Tests,
 		sort: sortFunc,

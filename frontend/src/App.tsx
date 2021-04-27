@@ -113,6 +113,7 @@ export default function App() {
         <button onClick={() => handleGenerateLogs("")}>Generate with this order</button>
         <button onClick={() => handleGenerateLogs("raw")}>Generate with tests sorted by raw lines covered</button>
         <button onClick={() => handleGenerateLogs("net")}>Generate with tests sorted by net lines covered</button>
+        <button onClick={() => handleGenerateLogs("importance")}>Generate with tests sorted by 'importance' heuristic</button>
       </div>
     )
   }

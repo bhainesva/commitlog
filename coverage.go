@@ -76,6 +76,76 @@ func sortTestsByRawLinesCovered(testProfiles map[string][]*cover.Profile) []stri
 	return tests
 }
 
+func scoreLines(profiles []*cover.Profile) map[string]map[int]int {
+	scores := map[string]map[int]int{}
+
+	for _, profile := range profiles {
+		if _, ok := scores[profile.FileName]; !ok {
+			scores[profile.FileName] = map[int]int{}
+		}
+
+		for _, b := range profile.Blocks {
+			if b.Count != 1 {
+				continue
+			}
+
+			for line:=b.StartLine;line<=b.EndLine;line++ {
+				scores[profile.FileName][line]++
+			}
+		}
+	}
+
+	return scores
+}
+
+func scoreProfiles(profiles []*cover.Profile, lineWeights map[string]map[int]int) float64 {
+	totalScore := 0.0
+	totalLines := 0.0
+
+	for _, p := range profiles {
+		for _, b := range p.Blocks {
+			for line:=b.StartLine;line<b.EndLine;line++ {
+				totalLines += 1
+				totalScore += float64(lineWeights[p.FileName][line])
+			}
+		}
+	}
+
+	if totalLines == 0 {
+		return 0
+	}
+
+	return totalScore / totalLines
+}
+
+// sortTestsByImportance sort tests using an 'importance' metric
+// each line in a file is given a point for every test that covers it
+// then tests are ranked by the average value of the lines they cover
+func sortTestsByImportance(testProfiles map[string][]*cover.Profile) []string {
+	allProfiles := []*cover.Profile{}
+	tests := []string{}
+
+	for test, ps := range testProfiles {
+		tests = append(tests, test)
+		allProfiles = append(allProfiles, ps...)
+	}
+
+	lineWeights := scoreLines(allProfiles)
+
+	avgScoreByTest := map[string]float64{}
+	for test, profiles := range testProfiles {
+		avgScoreByTest[test] = scoreProfiles(profiles, lineWeights)
+	}
+
+	sort.Slice(tests, func(i, j int) bool {
+		iCount := avgScoreByTest[tests[i]]
+		jCount := avgScoreByTest[tests[j]]
+		return iCount < jCount
+	})
+
+	return tests
+}
+
 func sortTestsByNewLinesCovered(testProfiles map[string][]*cover.Profile) []string {
 	var sortedTests []string
 	var tests []string
