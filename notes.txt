@@ -6,7 +6,6 @@ tmp files for coverage files / cleanup or something
 frontend:
 error messages for missing package
 collapsible files
-allow test order to be customized
 
 
 Notes:

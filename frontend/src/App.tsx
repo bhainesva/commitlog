@@ -1,11 +1,10 @@
-import React, { useState, MouseEvent, useRef, FC } from "react";
-import classNames from 'classnames';
+import React, { useState, MouseEvent, useCallback, useRef, FC } from "react";
 import PackagePicker from "./PackagePicker";
 import ReactDiffViewer from 'react-diff-viewer';
-import { DndProvider, DropTargetMonitor, useDrop, XYCoord } from 'react-dnd'
+import { DndProvider, DragPreviewImage, DropTargetMonitor, useDrop, XYCoord } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
-
-import { useDrag } from 'react-dnd'
+import { DraggableList } from "./DraggableList"
+import update from 'immutability-helper'
 
 declare var Prism: any;
 
@@ -74,6 +73,7 @@ export default function App() {
     return out
   }
 
+
   async function handleSubmit(pkg: string) {
     const testNames = await fetchTestNames(pkg);
     setTests(testNames);
@@ -97,7 +97,7 @@ export default function App() {
           Order your tests man
         </div>
         <DndProvider backend={HTML5Backend}>
-          {tests.map((t, i) => <Test index={i} moveCard={i => console.log(i)} id={i} key={i} name={t} isActive={i === activeTest} onClick={() => setActiveTest(i)} />)}
+          <DraggableList setItems={setTests} items={tests} />
         </DndProvider>
       </div>
     )
@@ -121,107 +121,6 @@ export default function App() {
           {filesView()}
         </div>
       </div>
-    </div>
-  )
-}
-
-interface DragItem {
-  index: number
-  id: string
-  type: string
-}
-
-export interface TestProps {
-  id: any
-  index: number
-  name: string,
-  isActive: boolean,
-  onClick: (e: MouseEvent<HTMLButtonElement>) => void,
-  moveCard: (dragIndex: number, hoverIndex: number) => void
-}
-
-const Test: FC<TestProps> = ({ id, index, name, moveCard, isActive }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const [{ handlerId }, drop] = useDrop(() => ({
-    accept: ItemTypes.TEST,
-    collect: (monitor) => ({
-      handlerId: monitor.getHandlerId(),
-    }),
-    hover(item: DragItem, monitor: DropTargetMonitor) {
-      if (!ref.current) {
-        return
-      }
-
-      const dragIndex = item.index;
-      const hoverIndex = index;
-
-      if (dragIndex === hoverIndex) {
-        return
-      }
-
-      const hoverBoundingRect = ref.current?.getBoundingClientRect()
-
-      // Get vertical middle
-      const hoverMiddleY =
-        (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2
-
-      // Determine mouse position
-      const clientOffset = monitor.getClientOffset()
-
-      // Get pixels to the top
-      const hoverClientY = (clientOffset as XYCoord).y - hoverBoundingRect.top
-
-      // Only perform the move when the mouse has crossed half of the items height
-      // When dragging downwards, only move when the cursor is below 50%
-      // When dragging upwards, only move when the cursor is above 50%
-
-      // Dragging downwards
-      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) {
-        return
-      }
-
-      // Dragging upwards
-      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) {
-        return
-      }
-
-      // Time to actually perform the action
-      moveCard(dragIndex, hoverIndex)
-
-      // Note: we're mutating the monitor item here!
-      // Generally it's better to avoid mutations,
-      // but it's good here for the sake of performance
-      // to avoid expensive index searches.
-      item.index = hoverIndex
-    }
-  }))
-
-  const [{ isDragging }, drag] = useDrag({
-    type: ItemTypes.TEST,
-    item: () => {
-      return { id, index }
-    },
-    collect: (monitor: any) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  })
-
-  const opacity = isDragging ? 0 : 1;
-  drag(drop(ref));
-
-  return (
-    <div ref={drag}
-      style={{
-        opacity,
-        fontSize: 25,
-        fontWeight: 'bold',
-        cursor: 'move',
-      }}>
-      TEST WRAPPER
-      <br />
-      <button className={classNames({ 'Test': true, 'is-active': isActive })}>
-        {name}
-      </button>
     </div>
   )
 }

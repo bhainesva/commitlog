@@ -1963,6 +1963,21 @@ icss-utils@^5.0.0, icss-utils@^5.1.0:
   resolved "https://registry.yarnpkg.com/icss-utils/-/icss-utils-5.1.0.tgz#c6be6858abd013d768e98366ae47e25d5887b1ae"
   integrity sha512-soFhflCVWLfRNOPU3iv5Z9VUdT44xFRbzjLsEzSr5AQmgqPMTHdU3PMT1Cf1ssx8fLNJDA1juftYl+PUcv3MqA==
 
+immutability-helper@^3.1.1:
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/immutability-helper/-/immutability-helper-3.1.1.tgz#2b86b2286ed3b1241c9e23b7b21e0444f52f77b7"
+  integrity sha512-Q0QaXjPjwIju/28TsugCHNEASwoCcJSyJV3uO1sOIQGI0jKgm9f41Lvz0DZj3n46cNCyAZTsEYoY4C2bVRUzyQ==
+
+immutable-helper@^0.0.5:
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/immutable-helper/-/immutable-helper-0.0.5.tgz#51682ab00f822753f266c57b9f4cd185c67dc468"
+  integrity sha1-UWgqsA+CJ1PyZsV7n0zRhcZ9xGg=
+
+immutable-helpers@^0.1.1:
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/immutable-helpers/-/immutable-helpers-0.1.1.tgz#235537b89cba6901f4b8e3a769753ae6b1cfe39e"
+  integrity sha1-I1U3uJy6aQH0uOOnaXU65rHP454=
+
 import-fresh@^3.1.0:
   version "3.3.0"
   resolved "https://registry.yarnpkg.com/import-fresh/-/import-fresh-3.3.0.tgz#37162c25fcb9ebaa2e6e53d5b4d88ce17d9e0c2b"
