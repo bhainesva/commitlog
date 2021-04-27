@@ -27,13 +27,11 @@ import (
 )
 
 var (
-	toDDelete map[dst.Node]struct{}
 	// pkg -> test name -> coverage profiles
 	coverageCache map[string]map[string][]*cover.Profile
 )
 
 func init() {
-	toDDelete = map[dst.Node]struct{}{}
 	coverageCache = map[string]map[string][]*cover.Profile{}
 }
 
@@ -236,7 +234,7 @@ func mergeProfiles(profiles ...*cover.Profile) []*cover.Profile {
 	return outProfiles
 }
 
-func pre(fset *token.FileSet, profile *cover.Profile, m decorator.Map) func(cursor *dstutil.Cursor) bool {
+func pre(fset *token.FileSet, profile *cover.Profile, m decorator.Map, deleteMap map[dst.Node]struct{}) func(cursor *dstutil.Cursor) bool {
 	return func(cursor *dstutil.Cursor) bool {
 		node := cursor.Node()
 		astNode := getAstByDst(m, node)
@@ -251,24 +249,26 @@ func pre(fset *token.FileSet, profile *cover.Profile, m decorator.Map) func(curs
 				return false
 			}
 
-			toDDelete[cursor.Parent()] = struct{}{}
+			deleteMap[cursor.Parent()] = struct{}{}
 			return true
 		}
 		return true
 	}
 }
 
-func post(cursor *dstutil.Cursor) bool {
-	if cursor.Node() == nil {
-		return true
-	}
-	if _, ok := toDDelete[cursor.Node()]; ok {
-		if cursor.Index() >= 0 {
-			cursor.Delete()
+func post(deleteMap map[dst.Node]struct{}) func(cursor *dstutil.Cursor) bool {
+	return func(cursor *dstutil.Cursor) bool {
+		if cursor.Node() == nil {
 			return true
 		}
+		if _, ok := deleteMap[cursor.Node()]; ok {
+			if cursor.Index() >= 0 {
+				cursor.Delete()
+				return true
+			}
+		}
+		return true
 	}
-	return true
 }
 
 func getStrippedFiles(profiles []*cover.Profile) (map[string]*dst.File, error) {
@@ -294,15 +294,16 @@ func getStrippedFile(profile *cover.Profile) (*dst.File, error) {
 	}
 	log.Println("Found at: ", p)
 
-	fset := token.NewFileSet()
-	d := decorator.NewDecorator(fset)
+	fSet := token.NewFileSet()
+	d := decorator.NewDecorator(fSet)
 	f, err := d.ParseFile(p, nil, parser.ParseComments)
 	if err != nil {
 		return nil, err
 	}
 
-	newtree := dstutil.Apply(f, pre(fset, profile, d.Map), post).(*dst.File)
-	return newtree, nil
+	toDelete := map[dst.Node]struct{}{}
+	newTree := dstutil.Apply(f, pre(fSet, profile, d.Map, toDelete), post(toDelete)).(*dst.File)
+	return newTree, nil
 }
 
 func getTestProfile(pkg, test string) ([]*cover.Profile, error) {

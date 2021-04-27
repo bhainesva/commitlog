@@ -21,6 +21,7 @@ export default function App() {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [landingPage, setLandingPage] = useState(true);
   const [activeTest, setActiveTest] = useState(-1);
+  const [activePkg, setActivePkg] = useState("");
 
   const fetchTestNames = async (pkg: string) => {
     return fetch('http://localhost:3000/listTests?pkg=' + pkg)
@@ -75,8 +76,13 @@ export default function App() {
 
 
   async function handleSubmit(pkg: string) {
+    setActivePkg(pkg)
     const testNames = await fetchTestNames(pkg);
     setTests(testNames);
+  }
+
+  async function handleGenerateLogs() {
+    fetchFiles(activePkg, tests).then(setFiles)
   }
 
   // Landing Page
@@ -99,6 +105,7 @@ export default function App() {
         <DndProvider backend={HTML5Backend}>
           <DraggableList setItems={setTests} items={tests} />
         </DndProvider>
+        <button onClick={handleGenerateLogs}>Generate Log</button>
       </div>
     )
   }
@@ -114,7 +121,7 @@ export default function App() {
             Tests
             ---------------
           </div>
-          {/* {tests.map((t, i) => <Test key={i} name={t} isActive={i === activeTest} onClick={() => setActiveTest(i)} />)} */}
+          {tests.map((t, i) => <button key={i} name={t} className={i === activeTest ? 'is-active' : ''} onClick={() => setActiveTest(i)}>{t}</button>)}
           <button className={tests.length == activeTest ? 'is-active' : ''} onClick={() => setActiveTest(tests.length)}>Final</button>
         </div>
         <div className="Files">
