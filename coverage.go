@@ -23,10 +23,22 @@ import (
 var (
 	// pkg -> test name -> coverage profiles
 	coverageCache map[string]map[string][]*cover.Profile
+
+	// job uuid -> job status
+	jobCacheChan chan Request
 )
 
 func init() {
 	coverageCache = map[string]map[string][]*cover.Profile{}
+	jobCacheChan = make(chan Request)
+	go Cache(jobCacheChan)
+}
+
+type jobCacheEntry struct {
+	Complete bool
+	Details string
+	Error error
+	Results filesResponse
 }
 
 // golang.org/x/tools/cmd/cover/func.go
@@ -72,7 +84,6 @@ func sortTestsByRawLinesCovered(testProfiles map[string][]*cover.Profile) []stri
 		return iCount < jCount
 	})
 
-	log.Println("Coverage map: ", coverageByTest)
 	return tests
 }
 
@@ -316,7 +327,6 @@ func post(deleteMap map[dst.Node]struct{}) func(cursor *dstutil.Cursor) bool {
 }
 
 func getStrippedFiles(profiles []*cover.Profile) (map[string]*dst.File, error) {
-	log.Println("Getting stripped files")
 	files := map[string]*dst.File{}
 
 	for _, profile := range profiles {
@@ -331,12 +341,10 @@ func getStrippedFiles(profiles []*cover.Profile) (map[string]*dst.File, error) {
 }
 
 func getStrippedFile(profile *cover.Profile) (*dst.File, error) {
-	log.Println("Finding file: ", profile.FileName)
 	p, err := findFile(profile.FileName)
 	if err != nil {
 		return nil, err
 	}
-	log.Println("Found at: ", p)
 
 	fSet := token.NewFileSet()
 	d := decorator.NewDecorator(fSet)
@@ -353,11 +361,13 @@ func getStrippedFile(profile *cover.Profile) (*dst.File, error) {
 func getTestProfile(pkg, test string) ([]*cover.Profile, error) {
 	if testMap, ok := coverageCache[pkg]; ok {
 		if profiles, ok := testMap[test]; ok {
+			log.Println("Cache hit for: ", pkg, test)
 			return profiles, nil
 		}
 	} else {
 		coverageCache[pkg] = map[string][]*cover.Profile{}
 	}
+	log.Println("Starting coverage run")
 	cmd := exec.Command("go", "test", pkg, "-run", "^"+test+"$", "--coverprofile=coverage.out")
 	err := cmd.Run()
 	if err != nil {
@@ -371,11 +381,13 @@ func getTestProfile(pkg, test string) ([]*cover.Profile, error) {
 	os.Remove("coverage.out")
 
 	coverageCache[pkg][test] = profiles
+	log.Println("Profiles: ", profiles)
 	return profiles, nil
 }
 
 type testSortingFunction func(map[string][]*cover.Profile) []string
 type computationConfig struct {
+	uuid string
 	pkg   string
 	tests []string
 	sort  testSortingFunction
@@ -394,8 +406,16 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 
 	var prevProfiles []*cover.Profile
 
-	for _, test := range tests {
+	for i, test := range tests {
 		profiles, err := getTestProfile(pkg, test)
+		jobCacheChan <- Request{
+			Type:    WRITE,
+			Payload: jobCacheEntry{
+				Complete: false,
+				Details:  fmt.Sprintf("Computing coverage for %d of %d tests", i, len(tests)),
+			},
+			Key:     config.uuid,
+		}
 		if err != nil {
 			return nil, nil, err
 		}
@@ -403,7 +423,25 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 		profilesByTest[test] = profiles
 	}
 
+	jobCacheChan <- Request{
+		Type:    WRITE,
+		Payload: jobCacheEntry{
+			Complete: false,
+			Details:  "Computing test ordering",
+		},
+		Key:     config.uuid,
+	}
+
 	sortedTests := config.sort(profilesByTest)
+
+	jobCacheChan <- Request{
+		Type:    WRITE,
+		Payload: jobCacheEntry{
+			Complete: false,
+			Details:  "Constructing diffs",
+		},
+		Key:     config.uuid,
+	}
 
 	for i, test := range sortedTests {
 		profiles := profilesByTest[test]

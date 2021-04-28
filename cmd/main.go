@@ -17,6 +17,7 @@ func main() {
 		AllowedHeaders: []string{"Accept", "Content-Type"},
 	}))
 
+	r.Get("/job/{id:[0-9a-zA-Z-]+}", commitlog.JobStatus)
 	r.Get("/listTests", commitlog.HandleTests)
 	r.Post("/listFiles", commitlog.HandleFiles)
 	r.Post("/listTestFiles", commitlog.HandleTestFiles)
