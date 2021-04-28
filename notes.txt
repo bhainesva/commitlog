@@ -4,13 +4,12 @@ tmp files for coverage files / cleanup or something
 job queue / polling / some alternative to waiting minutes for a response
 incorporate deadcode removal
 more algorithms to generate good test orders
+simplify testing flow
 
 frontend:
 error messages for missing package
-collapsible files
 loading animations
 general styling
-
 
 Notes:
 thought just deleting uncovered lines would be enough but it wasn't because of how the weird { } cases

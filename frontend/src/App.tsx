@@ -4,6 +4,7 @@ import ReactDiffViewer from 'react-diff-viewer';
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { DraggableList } from "./DraggableList"
+import * as R from 'ramda'
 
 declare var Prism: any;
 
@@ -18,7 +19,7 @@ export const ItemTypes = {
 export default function App() {
   const [tests, setTests] = useState([]);
   const [files, setFiles] = useState<FileInfo[]>([]);
-  const [landingPage, setLandingPage] = useState(true);
+  const [collapseStatus, setCollapseStatus] = useState<{[key: string]: boolean}>({});
   const [activeTest, setActiveTest] = useState(-1);
   const [activePkg, setActivePkg] = useState("");
 
@@ -37,6 +38,10 @@ export default function App() {
       })
     })
       .then(r => r.json())
+  }
+
+  const toggleCollapse = (file: string) => {
+    setCollapseStatus(R.assoc(file, !collapseStatus[file], collapseStatus))
   }
 
   const highlightSyntax = (str: string) => (
@@ -58,15 +63,17 @@ export default function App() {
       const previousContent = previousContents[name] || '';
       out.push(
         <div key={name} className="File">
-          {/* <button onClick={() => console.log(name)} className="File-name">{name}</button> */}
+          <button onClick={() => toggleCollapse(name)} className="File-name">{name}</button>
+          {collapseStatus[name] || 
           <ReactDiffViewer
             oldValue={atob(previousContent)}
             newValue={atob(content)}
             splitView={false}
             leftTitle={name}
+            styles={{titleBlock: {display: "none"}}}
             showDiffOnly={Object.keys(contents).length > 1 ? true : false}
             renderContent={highlightSyntax}
-          />
+          />}
         </div>
       )
     }

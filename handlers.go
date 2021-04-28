@@ -71,6 +71,40 @@ type filesResponse struct {
 	Files []map[string][]byte `json:"files,omitempty""`
 }
 
+func HandleTestFiles(w http.ResponseWriter, r *http.Request) {
+	resp := filesResponse{
+		Tests: []string{"Test1", "Test2", "Test3"},
+		Files: []map[string][]byte{
+			map[string][]byte{
+				"file/number/one.go": []byte("Here is some file content"),
+				"file/number/two.go": []byte("Here is some file content"),
+				"file/number/three.go": []byte("Here is some file content"),
+				"file/number/four.go": []byte("Here is some file content"),
+			},
+			map[string][]byte{
+				"file/number/one.go": []byte("The content changes"),
+				"file/number/two.go": []byte("As we all do"),
+				"file/number/three.go": []byte("oh no"),
+				"file/number/four.go": []byte("Big things ahead"),
+			},
+			map[string][]byte{
+				"file/number/one.go": []byte("Now the files are happy"),
+				"file/number/two.go": []byte("This is their true form"),
+				"file/number/three.go": []byte("I told you they could do it"),
+				"file/number/four.go": []byte("Yay for the files"),
+			},
+		},
+	}
+
+	js, err := json.Marshal(resp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Write(js)
+}
+
 func HandleFiles(w http.ResponseWriter, r *http.Request) {
 	var req filesRequest
 	err := json.NewDecoder(r.Body).Decode(&req)

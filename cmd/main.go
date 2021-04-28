@@ -19,6 +19,7 @@ func main() {
 
 	r.Get("/listTests", commitlog.HandleTests)
 	r.Post("/listFiles", commitlog.HandleFiles)
+	r.Post("/listTestFiles", commitlog.HandleTestFiles)
 	r.Get("/listPackages", commitlog.HandlePackages)
 	http.ListenAndServe(":3000", r)
 }
