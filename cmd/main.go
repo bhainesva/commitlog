@@ -1,99 +1,104 @@
 package main
 
 import (
-	"fmt"
 	"go/ast"
-	"go/parser"
+	"go/printer"
 	"go/token"
+	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/packages"
+	"log"
+	"os"
 )
 
 func main() {
-	pruneast("test.go")
-	//r := chi.NewRouter()
-	//r.Use(middleware.Logger)
-	//r.Use(cors.Handler(cors.Options{
-	//	AllowedOrigins: []string{"https://*", "http://*"},
-	//	AllowedMethods: []string{"GET", "POST"},
-	//	AllowedHeaders: []string{"Accept", "Content-Type"},
-	//}))
-	//
-	//r.Get("/listTests", commitlog.HandleTests)
-	//r.Post("/listFiles", commitlog.HandleFiles)
-	//r.Get("/listPackages", commitlog.HandlePackages)
-	//log.Println("Listening on port 3000...")
-	//http.ListenAndServe(":3000", r)
+	removeDeadCode("./tmp")
 }
 
-type typeVisitor struct {}
-func (v typeVisitor) Visit(node ast.Node) ast.Visitor {
-	switch n := node.(type) {
-	case *ast.Field:
-		fmt.Println("Saw field: ", n.Type)
-	case *ast.FieldList:
-		fmt.Printf("Saw fieldlist: %#v\n", n.List)
-	case *ast.Ident:
-		if n.Obj != nil {
-			fmt.Println("Saw ident: ", n.Name, n.Obj.Kind, n.Obj.Name, n.Obj.Data, n.Obj.Decl)
-		} else {
-			fmt.Println("Saw ident: ", n.Name)
-		}
-	case *ast.TypeSpec:
-		fmt.Println("Saw typespec: ", n.Name)
-	case *ast.StructType:
-		fmt.Println("Saw structtype: ", n.Fields)
-	}
-	return v
-}
-
-func pruneast(fn string) {
-	fSet := token.NewFileSet()
-	//d := decorator.NewDecorator(fSet)
-	_, err := parser.ParseFile(fSet, fn, nil, parser.ParseComments)
+func fatalIf(err error) {
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
-	//ast.Walk(typeVisitor{}, f)
+}
 
+func removeDeadCode(pattern string) {
 	conf := &packages.Config{
-		Mode: packages.NeedTypes | packages.NeedTypesInfo,
+		Mode: packages.NeedTypes | packages.NeedTypesInfo | packages.NeedSyntax,
 	}
-	pkgs, err := packages.Load(conf, "main")
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(pkgs)
+	pkgs, err := packages.Load(conf, pattern)
+	fatalIf(err)
 
-	//used := make(map[types.Object]bool)
+	usedNames := map[string]struct{}{}
+	unusedByName := map[string]ast.Node{}
+
+	//usages := map[ast.Node]types.Object{}
+
 	for _, pkg := range pkgs {
-		fmt.Println(pkg.TypesInfo)
-		fmt.Println(pkg.TypesInfo.Uses)
+		for _, file := range pkg.Syntax {
+			ast.Inspect(file, func(n ast.Node) bool {
+				if n, ok := n.(*ast.Ident); ok {
+					if n.Name == "main" { return true }
+					log.Println("Ident - Use Obj: ", n, pkg.TypesInfo.Uses[n])
+					obj := pkg.Types.Scope().Lookup(n.Name)
+					log.Println("Lookup scope: ", obj)
+
+					if _, ok := pkg.TypesInfo.Uses[n]; ok {
+						usedNames[n.Name] = struct{}{}
+						delete(unusedByName, n.Name)
+					} else {
+						unusedByName[n.Name] = n
+						return false
+					}
+				}
+				return true
+			})
+
+			log.Println("unused names: ", unusedByName)
+
+			toDelete := map[ast.Node]struct{}{}
+			toDeleteParentType := map[ast.Node]struct{}{}
+			newTree := astutil.Apply(file, func(c *astutil.Cursor) bool {
+				if f, ok2 := c.Node().(*ast.Ident); ok2 {
+					if unusedNode, ok := unusedByName[f.Name]; !ok || c.Node() != unusedNode {
+						return true
+					}
+
+					parent := c.Parent()
+					if p, ok := parent.(*ast.Field); ok {
+						// Only one field declared, delete whole row
+						if len(p.Names) == 1 {
+							toDelete[parent] = struct{}{}
+							return false
+						} else { // delete just this identifier
+							c.Delete()
+							return false
+						}
+					}
+
+					if _, ok := parent.(*ast.TypeSpec); ok {
+						toDeleteParentType[parent] = struct{}{}
+						return false
+					}
+				}
+
+				return true
+			}, func(c *astutil.Cursor) bool {
+				if _, ok := toDelete[c.Node()]; ok {
+					c.Delete()
+				}
+
+				if _, ok := toDeleteParentType[c.Node()]; ok {
+					if _, ok := c.Node().(*ast.GenDecl); ok {
+						c.Delete()
+					} else {
+						toDeleteParentType[c.Parent()] = struct{}{}
+					}
+				}
+				return true
+			})
+
+			err := printer.Fprint(os.Stdout, token.NewFileSet(), newTree)
+			fatalIf(err)
+		}
 	}
-	//	for _, file := range pkg.Files {
-	//		ast.Inspect(file, func(n ast.Node) bool {
-	//			id, ok := n.(*ast.Ident)
-	//			if !ok {
-	//				return true
-	//			}
-	//			obj := pkg.Info.Uses[id]
-	//			if obj != nil {
-	//				used[obj] = true
-	//			}
-	//			return false
-	//		})
-	//	}
-	//
-	//	global := pkg.Pkg.Scope()
-	//	var unused []types.Object
-	//	for _, name := range global.Names() {
-	//		if pkg.Pkg.Name() == "main" && name == "main" {
-	//			continue
-	//		}
-	//		obj := global.Lookup(name)
-	//		if !used[obj] && (pkg.Pkg.Name() == "main" || !ast.IsExported(name)) {
-	//			unused = append(unused, obj)
-	//		}
-	//	}
-	//	fmt.Println("UNUSED: ", unused)
-	//}
+
 }
