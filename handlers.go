@@ -21,7 +21,7 @@ func filterToTests(ss []string) []string {
 }
 
 func HandlePackages(w http.ResponseWriter, r *http.Request) {
-	cmd := exec.Command("go", "list", "./...")
+	cmd := exec.Command("go", "list", "...")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
@@ -63,14 +63,13 @@ func HandleTests(w http.ResponseWriter, r *http.Request) {
 type filesRequest struct {
 	Tests []string `json:"tests,omitempty"`
 	Pkg   string   `json:"pkg,omitempty"`
-	Sort   string   `json:"sort,omitempty"`
+	Sort  string   `json:"sort,omitempty"`
 }
 
 type filesResponse struct {
-	Tests []string `json:"tests,omitempty"`
+	Tests []string            `json:"tests,omitempty"`
 	Files []map[string][]byte `json:"files,omitempty""`
 }
-
 
 func HandleFiles(w http.ResponseWriter, r *http.Request) {
 	var req filesRequest
@@ -87,13 +86,13 @@ func HandleFiles(w http.ResponseWriter, r *http.Request) {
 	} else if req.Sort == "net" {
 		sortFunc = sortTestsByNewLinesCovered
 	} else if req.Sort == "importance" {
-sortFunc = sortTestsByImportance
-}
+		sortFunc = sortTestsByImportance
+	}
 
-tests, fileContents, err := computeFileContentsByTest(computationConfig{
+	tests, fileContents, err := computeFileContentsByTest(computationConfig{
 		pkg:   req.Pkg,
 		tests: req.Tests,
-		sort: sortFunc,
+		sort:  sortFunc,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

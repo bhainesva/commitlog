@@ -1,11 +1,15 @@
 TODO:
 backend:
-algorithm to generate good test orders
 tmp files for coverage files / cleanup or something
+job queue / polling / some alternative to waiting minutes for a response
+incorporate deadcode removal
+more algorithms to generate good test orders
 
 frontend:
 error messages for missing package
 collapsible files
+loading animations
+general styling
 
 
 Notes:

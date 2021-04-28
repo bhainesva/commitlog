@@ -44,7 +44,7 @@ func linesCovered(pp ...*cover.Profile) map[int]struct{} {
 
 	for _, p := range pp {
 		for _, b := range p.Blocks {
-			for line := b.StartLine;line<=b.EndLine;line++ {
+			for line := b.StartLine; line <= b.EndLine; line++ {
 				lines[line] = struct{}{}
 			}
 		}
@@ -89,7 +89,7 @@ func scoreLines(profiles []*cover.Profile) map[string]map[int]int {
 				continue
 			}
 
-			for line:=b.StartLine;line<=b.EndLine;line++ {
+			for line := b.StartLine; line <= b.EndLine; line++ {
 				scores[profile.FileName][line]++
 			}
 		}
@@ -104,7 +104,7 @@ func scoreProfiles(profiles []*cover.Profile, lineWeights map[string]map[int]int
 
 	for _, p := range profiles {
 		for _, b := range p.Blocks {
-			for line:=b.StartLine;line<b.EndLine;line++ {
+			for line := b.StartLine; line < b.EndLine; line++ {
 				totalLines += 1
 				totalScore += float64(lineWeights[p.FileName][line])
 			}
@@ -237,7 +237,6 @@ func mergeProfiles(existingProfiles, newProfiles []*cover.Profile) ([]*cover.Pro
 	for _, profile := range append(existingProfiles, newProfiles...) {
 		profileByFiles[profile.FileName] = append(profileByFiles[profile.FileName], profile)
 	}
-
 
 	var outProfiles []*cover.Profile
 
@@ -377,10 +376,11 @@ func getTestProfile(pkg, test string) ([]*cover.Profile, error) {
 
 type testSortingFunction func(map[string][]*cover.Profile) []string
 type computationConfig struct {
-	pkg string
+	pkg   string
 	tests []string
-	sort testSortingFunction
+	sort  testSortingFunction
 }
+
 // computeFileContentsByTest takes a package name and test ordering
 // and returns a map filename -> fileContents for each test, where the content
 // is what is covered by the tests up to that point in the ordering
