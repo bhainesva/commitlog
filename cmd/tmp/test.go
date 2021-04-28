@@ -1,21 +1,26 @@
 package main
 
-import "fmt"
+import fmt "fmt"
 
-type UsedStruct struct {
-	UsedField, Two string
-	UnusedField int
+type UsedType struct {
+	UsedField, UnusedField string
+	SecondUnusedField    int
 }
 
-type UnusedStruct struct {
+type UnusedType struct {
 	A string
 }
 
-func main() {
-	h := UsedStruct{UsedField: "Hi"}
-	fmt.Println(h)
+func UsedFunc(u UsedType) {
+	type UnusedNestedType struct{}
+	fmt.Println(u)
+}
 
-	//// Shadow unused name to test
-	//UnusedStruct := "hi"
-	//fmt.Println(UnusedStruct)
+func main() {
+	h := UsedType{UsedField: "Hi"}
+	UsedFunc(h)
+
+	//// Testing with shadowed name
+	UnusedStruct := "hi"
+	fmt.Println(UnusedStruct)
 }
