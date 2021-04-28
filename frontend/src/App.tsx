@@ -51,7 +51,7 @@ export default function App() {
         sort: sortType,
       })
     })
-      .then(r => r.json())
+      .then(r => r.text())
   }
 
   const toggleCollapse = (file: string) => {
@@ -108,11 +108,27 @@ export default function App() {
     }
   }
 
+  async function checkJobStatus(id: string) {
+    const data = await fetch(`http://localhost:3000/job/${id}`)
+      .then(r => r.json())
+
+    if (data.Complete) {
+      console.log("Job Complete! Updating files and tests")
+      setTests(data.Results.tests);
+      setFiles(data.Results.files);
+    } else {
+      if (data.Error) {
+        console.error("Job failed!: ", data.Error)
+      } else {
+        console.log("Current Status: ", data.Details)
+        setTimeout(() => checkJobStatus(id), 300)
+      }
+    }
+  }
+
   async function handleGenerateLogs(sortType: string) {
     fetchFiles(activePkg, tests, sortType).then(data => {
-      console.log("got: ", data);
-      setTests(data.tests);
-      setFiles(data.files);
+      checkJobStatus(data)
     })
   }
 
