@@ -1,10 +1,9 @@
 TODO:
 backend:
 tmp files for coverage files / cleanup or something
-job queue / polling / some alternative to waiting minutes for a response
-incorporate deadcode removal
 more algorithms to generate good test orders
 simplify testing flow
+run tests in parallel?
 
 frontend:
 error messages for missing package

@@ -6,6 +6,7 @@ type Person struct {
 	Name     string // This is their normal name
 	Nickname string // You can call them this
 	Title    string // It's their title
+	Unused   string
 }
 
 // FormatCasual formats a person's name like they're your friend

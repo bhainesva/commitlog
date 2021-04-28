@@ -4,7 +4,7 @@ import fmt "fmt"
 
 type UsedType struct {
 	UsedField, UnusedField string
-	SecondUnusedField    int
+	SecondUnusedField      int
 }
 
 type UnusedType struct {

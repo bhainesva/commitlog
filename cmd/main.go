@@ -24,4 +24,3 @@ func main() {
 	r.Get("/listPackages", commitlog.HandlePackages)
 	http.ListenAndServe(":3000", r)
 }
-

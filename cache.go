@@ -9,10 +9,10 @@ const (
 )
 
 type Request struct {
-	Type RequestType
+	Type    RequestType
 	Payload jobCacheEntry
-	Key string
-	Out chan Request
+	Key     string
+	Out     chan Request
 }
 
 func Cache(ch chan Request) {
@@ -30,4 +30,3 @@ func Cache(ch chan Request) {
 		}
 	}
 }
-

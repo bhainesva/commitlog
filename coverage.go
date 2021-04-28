@@ -24,7 +24,6 @@ var (
 	// pkg -> test name -> coverage profiles
 	coverageCache map[string]map[string][]*cover.Profile
 
-	// job uuid -> job status
 	jobCacheChan chan Request
 )
 
@@ -36,9 +35,9 @@ func init() {
 
 type jobCacheEntry struct {
 	Complete bool
-	Details string
-	Error error
-	Results filesResponse
+	Details  string
+	Error    error
+	Results  filesResponse
 }
 
 // golang.org/x/tools/cmd/cover/func.go
@@ -326,36 +325,43 @@ func post(deleteMap map[dst.Node]struct{}) func(cursor *dstutil.Cursor) bool {
 	}
 }
 
-func getStrippedFiles(profiles []*cover.Profile) (map[string]*dst.File, error) {
+func getStrippedFiles(profiles []*cover.Profile) (map[string]*dst.File, map[string]*decorator.Decorator, error) {
 	files := map[string]*dst.File{}
+	decorators := map[string]*decorator.Decorator{}
 
 	for _, profile := range profiles {
-		tree, err := getStrippedFile(profile)
+		tree, decorator, err := getStrippedFile(profile)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		files[profile.FileName] = tree
+		absfp, err := findFile(profile.FileName)
+		if err != nil {
+			return nil, nil, err
+		}
+		log.Println("fn: ", absfp)
+		files[absfp] = tree
+		decorators[absfp] = decorator
 	}
 
-	return files, nil
+	return files, decorators, nil
 }
 
-func getStrippedFile(profile *cover.Profile) (*dst.File, error) {
+func getStrippedFile(profile *cover.Profile) (*dst.File, *decorator.Decorator, error) {
 	p, err := findFile(profile.FileName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	fSet := token.NewFileSet()
 	d := decorator.NewDecorator(fSet)
 	f, err := d.ParseFile(p, nil, parser.ParseComments)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	toDelete := map[dst.Node]struct{}{}
 	newTree := dstutil.Apply(f, pre(fSet, profile, d.Map, toDelete), post(toDelete)).(*dst.File)
-	return newTree, nil
+	return newTree, d, nil
 }
 
 func getTestProfile(pkg, test string) ([]*cover.Profile, error) {
@@ -367,7 +373,6 @@ func getTestProfile(pkg, test string) ([]*cover.Profile, error) {
 	} else {
 		coverageCache[pkg] = map[string][]*cover.Profile{}
 	}
-	log.Println("Starting coverage run")
 	cmd := exec.Command("go", "test", pkg, "-run", "^"+test+"$", "--coverprofile=coverage.out")
 	err := cmd.Run()
 	if err != nil {
@@ -381,13 +386,12 @@ func getTestProfile(pkg, test string) ([]*cover.Profile, error) {
 	os.Remove("coverage.out")
 
 	coverageCache[pkg][test] = profiles
-	log.Println("Profiles: ", profiles)
 	return profiles, nil
 }
 
 type testSortingFunction func(map[string][]*cover.Profile) []string
 type computationConfig struct {
-	uuid string
+	uuid  string
 	pkg   string
 	tests []string
 	sort  testSortingFunction
@@ -409,12 +413,12 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 	for i, test := range tests {
 		profiles, err := getTestProfile(pkg, test)
 		jobCacheChan <- Request{
-			Type:    WRITE,
+			Type: WRITE,
 			Payload: jobCacheEntry{
 				Complete: false,
 				Details:  fmt.Sprintf("Computing coverage for %d of %d tests", i, len(tests)),
 			},
-			Key:     config.uuid,
+			Key: config.uuid,
 		}
 		if err != nil {
 			return nil, nil, err
@@ -424,23 +428,23 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 	}
 
 	jobCacheChan <- Request{
-		Type:    WRITE,
+		Type: WRITE,
 		Payload: jobCacheEntry{
 			Complete: false,
 			Details:  "Computing test ordering",
 		},
-		Key:     config.uuid,
+		Key: config.uuid,
 	}
 
 	sortedTests := config.sort(profilesByTest)
 
 	jobCacheChan <- Request{
-		Type:    WRITE,
+		Type: WRITE,
 		Payload: jobCacheEntry{
 			Complete: false,
 			Details:  "Constructing diffs",
 		},
-		Key:     config.uuid,
+		Key: config.uuid,
 	}
 
 	for i, test := range sortedTests {
@@ -449,11 +453,19 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 
 		contentsMap := map[string][]byte{}
 
-		files, err := getStrippedFiles(activeProfiles)
+		files, decorators, err := getStrippedFiles(activeProfiles)
 		if err != nil {
 			return nil, nil, err
 		}
-		for name, tree := range files {
+
+		// Parse package and kill dead code
+		undeadFiles, err := removeDeadCode(files, decorators, pkg)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Convert ASTs into []byte, get
+		for name, tree := range undeadFiles {
 			var buf bytes.Buffer
 			r := decorator.NewRestorer()
 			err = r.Fprint(&buf, tree)
@@ -464,12 +476,7 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 			contentsMap[name] = buf.Bytes()
 
 			if _, ok := finalContentsMap[name]; !ok {
-				fn, err := findFile(name)
-				if err != nil {
-					return nil, nil, err
-				}
-
-				fullFileData, err := ioutil.ReadFile(fn)
+				fullFileData, err := ioutil.ReadFile(name)
 				if err != nil {
 					return nil, nil, err
 				}

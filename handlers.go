@@ -78,22 +78,22 @@ func HandleTestFiles(w http.ResponseWriter, r *http.Request) {
 		Tests: []string{"Test1", "Test2", "Test3"},
 		Files: []map[string][]byte{
 			{
-				"file/number/one.go": []byte("Here is some file content"),
-				"file/number/two.go": []byte("Here is some file content"),
+				"file/number/one.go":   []byte("Here is some file content"),
+				"file/number/two.go":   []byte("Here is some file content"),
 				"file/number/three.go": []byte("Here is some file content"),
-				"file/number/four.go": []byte("Here is some file content"),
+				"file/number/four.go":  []byte("Here is some file content"),
 			},
 			{
-				"file/number/one.go": []byte("The content changes"),
-				"file/number/two.go": []byte("As we all do"),
+				"file/number/one.go":   []byte("The content changes"),
+				"file/number/two.go":   []byte("As we all do"),
 				"file/number/three.go": []byte("oh no"),
-				"file/number/four.go": []byte("Big things ahead"),
+				"file/number/four.go":  []byte("Big things ahead"),
 			},
 			{
-				"file/number/one.go": []byte("Now the files are happy"),
-				"file/number/two.go": []byte("This is their true form"),
+				"file/number/one.go":   []byte("Now the files are happy"),
+				"file/number/two.go":   []byte("This is their true form"),
 				"file/number/three.go": []byte("I told you they could do it"),
-				"file/number/four.go": []byte("Yay for the files"),
+				"file/number/four.go":  []byte("Yay for the files"),
 			},
 		},
 	}
@@ -110,10 +110,10 @@ func HandleTestFiles(w http.ResponseWriter, r *http.Request) {
 func JobStatus(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	outCh := make(chan Request)
-	jobCacheChan<-Request{
-		Type:    READ,
-		Key:     id,
-		Out:     outCh,
+	jobCacheChan <- Request{
+		Type: READ,
+		Key:  id,
+		Out:  outCh,
 	}
 
 	info := <-outCh
@@ -154,26 +154,26 @@ func HandleFiles(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			jobCacheChan <- Request{
-									   Type: WRITE,
-									   Payload: jobCacheEntry{
-									   Complete: true,
-									   Details:  "",
-									   Error:    err,
-									   },
-									   Key: id.String(),
-									   }
+				Type: WRITE,
+				Payload: jobCacheEntry{
+					Complete: true,
+					Details:  "",
+					Error:    err,
+				},
+				Key: id.String(),
+			}
 		} else {
 			log.Println("putting success in cache")
 			jobCacheChan <- Request{
-									   Type: WRITE,
-									   Payload: jobCacheEntry{
-									   Complete: true,
-									   Details:  "",
-									   Error:    nil,
-									   Results:  results,
-									   },
-									   Key: id.String(),
-									   }
+				Type: WRITE,
+				Payload: jobCacheEntry{
+					Complete: true,
+					Details:  "",
+					Error:    nil,
+					Results:  results,
+				},
+				Key: id.String(),
+			}
 		}
 	}()
 
@@ -199,7 +199,7 @@ func jobOperation(id string, req filesRequest) (filesResponse, error) {
 		pkg:   req.Pkg,
 		tests: req.Tests,
 		sort:  sortFunc,
-		uuid: id,
+		uuid:  id,
 	})
 	if err != nil {
 		return filesResponse{}, err

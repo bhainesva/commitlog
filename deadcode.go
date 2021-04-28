@@ -2,26 +2,33 @@ package commitlog
 
 import (
 	"fmt"
+	"github.com/dave/dst"
+	"github.com/dave/dst/decorator"
+	"github.com/dave/dst/dstutil"
 	"go/ast"
-	"go/printer"
 	"go/token"
-	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/packages"
-	"os"
 )
 
-func removeDeadCode(pattern string) error {
+func removeDeadCode(trees map[string]*dst.File, decorators map[string]*decorator.Decorator, pattern string) (map[string]*dst.File, error) {
+	fullFileByShortFile := map[string]string{}
 	conf := &packages.Config{
 		Mode: packages.NeedTypes | packages.NeedTypesInfo | packages.NeedSyntax,
-	}
-	pkgs, err := packages.Load(conf, pattern)
-	if err != nil {
-		return err
+		ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
+			d, _ := decorators[filename]
+			f, _ := trees[filename]
+			fullFileByShortFile[d.Ast.Nodes[f].(*ast.File).Name.Name] = filename
+			return d.Ast.Nodes[f].(*ast.File), nil
+		},
 	}
 
-	// Just testing on one package
+	pkgs, err := packages.Load(conf, pattern)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(pkgs) != 1 {
-		return fmt.Errorf("please only load 1 package")
+		return nil, fmt.Errorf("please only load 1 package")
 	}
 	pkg := pkgs[0]
 
@@ -53,25 +60,30 @@ func removeDeadCode(pattern string) error {
 		})
 	}
 
+	outFiles := map[string]*dst.File{}
 	for _, file := range pkg.Syntax {
 		// Sometimes we realize we want to delete a node while
 		// visiting its children. These sets give information to the
 		// post func to take care of that on the way back up the tree
-		toDelete := map[ast.Node]struct{}{}
-		toDeleteParentType := map[ast.Node]struct{}{}
+		toDelete := map[dst.Node]struct{}{}
+		toDeleteParentType := map[dst.Node]struct{}{}
 
+		name := fullFileByShortFile[file.Name.Name]
+		f := trees[name]
+		d := decorators[name]
 		// Traverse the AST a second time, deleting any identifiers
 		// marked for deletion in the first pass
-		newTree := astutil.Apply(file, func(c *astutil.Cursor) bool {
-			if n, ok := c.Node().(*ast.Ident); ok {
-				if _, ok := deletionCandidates[n.Pos()]; !ok {
+		newTree := dstutil.Apply(f, func(c *dstutil.Cursor) bool {
+			if _, ok := c.Node().(*dst.Ident); ok {
+				astNode := d.Ast.Nodes[c.Node()]
+				if _, ok := deletionCandidates[astNode.Pos()]; !ok {
 					return true
 				}
 
 				parent := c.Parent()
 
 				switch t := parent.(type) {
-				case *ast.Field:
+				case *dst.Field:
 					// Only one field declared, delete whole row
 					if len(t.Names) == 1 {
 						toDelete[parent] = struct{}{}
@@ -80,7 +92,7 @@ func removeDeadCode(pattern string) error {
 						c.Delete()
 						return false
 					}
-				case *ast.TypeSpec:
+				case *dst.TypeSpec:
 					// In this case the node we want to delete isn't the direct
 					// parent of the identifier. This struct is used to indicate
 					// we should continue up the tree until we find a GenDecl
@@ -90,7 +102,7 @@ func removeDeadCode(pattern string) error {
 			}
 
 			return true
-		}, func(c *astutil.Cursor) bool {
+		}, func(c *dstutil.Cursor) bool {
 			node := c.Node()
 			if _, ok := toDelete[node]; ok {
 				delete(toDelete, node)
@@ -107,7 +119,7 @@ func removeDeadCode(pattern string) error {
 
 			if _, ok := toDeleteParentType[node]; ok {
 				delete(toDeleteParentType, node)
-				if _, ok := node.(*ast.GenDecl); ok {
+				if _, ok := node.(*dst.GenDecl); ok {
 					if c.Index() < 0 {
 						toDelete[c.Parent()] = struct{}{}
 						return true
@@ -118,13 +130,10 @@ func removeDeadCode(pattern string) error {
 				}
 			}
 			return true
-		})
+		}).(*dst.File)
 
-		err := printer.Fprint(os.Stdout, token.NewFileSet(), newTree)
-		if err != nil {
-			return err
-		}
+		outFiles[name] = newTree
 	}
 
-	return nil
+	return outFiles, nil
 }
