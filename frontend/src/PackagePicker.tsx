@@ -3,13 +3,13 @@ import * as R from 'ramda';
 import {useCombobox} from 'downshift'
 
 interface Props {
+  packages: string[],
   onSubmit: (pkg: string) => void
 }
 
 export default function PackagePicker(props: Props) {
-  const [value, setValue] = useState('');
-  const [packages, setPackages] = useState([]);
   const [filteredPackages, setFilteredPackages] = useState([]);
+  const { packages } = props;
 
   const {
     isOpen,
@@ -29,17 +29,6 @@ export default function PackagePicker(props: Props) {
         R.take(10, packages.filter(item => item.toLowerCase().includes(inputValue.toLowerCase()))))
     },
   })
-
-  useEffect(() => {
-    fetchPackages().then((data) => {
-      setPackages(data)
-    })
-  }, [])
-
-  const fetchPackages = async () => {
-    return fetch('http://localhost:3000/listPackages')
-    .then(r => r.json())
-  }
 
   return (
     <div {...getComboboxProps()}>

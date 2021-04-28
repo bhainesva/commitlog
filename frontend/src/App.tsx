@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PackagePicker from "./PackagePicker";
 import ReactDiffViewer from 'react-diff-viewer';
 import { DndProvider } from 'react-dnd'
@@ -17,7 +17,9 @@ export const ItemTypes = {
 }
 
 export default function App() {
+  const [errorState, setErrorState] = useState('');
   const [tests, setTests] = useState([]);
+  const [packages, setPackages] = useState([]);
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [collapseStatus, setCollapseStatus] = useState<{[key: string]: boolean}>({});
   const [activeTest, setActiveTest] = useState(-1);
@@ -27,6 +29,18 @@ export default function App() {
     return fetch('http://localhost:3000/listTests?pkg=' + pkg)
       .then(r => r.json())
   }
+
+  useEffect(() => {
+    fetchPackages().then((data) => {
+      setPackages(data)
+    })
+  }, [])
+
+  const fetchPackages = async () => {
+    return fetch('http://localhost:3000/listPackages')
+    .then(r => r.json())
+  }
+
 
   const fetchFiles = async (pkg: string, testNames: string[], sortType: string) => {
     return fetch('http://localhost:3000/listFiles', {
@@ -83,10 +97,15 @@ export default function App() {
 
 
   async function handleSubmit(pkg: string) {
-    const testNames = await fetchTestNames(pkg);
-    setActivePkg(pkg)
-    setTests(testNames);
-    setFiles([])
+    if (!R.contains(pkg, packages)) {
+      setErrorState('We don\'t recognize that package!');
+      setTimeout(() => setErrorState(''), 3000);
+    } else {
+      const testNames = await fetchTestNames(pkg);
+      setActivePkg(pkg)
+      setTests(testNames);
+      setFiles([])
+    }
   }
 
   async function handleGenerateLogs(sortType: string) {
@@ -101,7 +120,10 @@ export default function App() {
   if (tests.length === 0 && files.length === 0) {
     return (
       <div className="LandingPage">
-        <PackagePicker onSubmit={handleSubmit} />
+        {packages.length === 0 ?
+          <div>Loading...</div> : <PackagePicker packages={packages} onSubmit={handleSubmit} />
+        }
+        {errorState}
       </div>
     )
   }
@@ -110,7 +132,8 @@ export default function App() {
   if (files.length === 0) {
     return (
       <div className="TestOrdering">
-        <PackagePicker onSubmit={handleSubmit} />
+        <PackagePicker packages={packages} onSubmit={handleSubmit} />
+        {errorState}
         <div>
           Order your tests man
         </div>
@@ -127,7 +150,8 @@ export default function App() {
 
   return (
     <div>
-      <PackagePicker onSubmit={handleSubmit} />
+      <PackagePicker packages={packages} onSubmit={handleSubmit} />
+      {errorState}
       <br /><br />
 
       <div className="Page">
