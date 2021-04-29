@@ -15,8 +15,8 @@ func removeDeadCode(trees map[string]*dst.File, decorators map[string]*decorator
 	conf := &packages.Config{
 		Mode: packages.NeedTypes | packages.NeedTypesInfo | packages.NeedSyntax,
 		ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
-			d, _ := decorators[filename]
-			f, _ := trees[filename]
+			d := decorators[filename]
+			f := trees[filename]
 			fullFileByShortFile[d.Ast.Nodes[f].(*ast.File).Name.Name] = filename
 			return d.Ast.Nodes[f].(*ast.File), nil
 		},
