@@ -15,6 +15,7 @@ const config = {
         new HtmlWebpackPlugin({
             title: 'Commit Logs',
             template: 'src/index.html',
+            favicon: "src/favicon.ico"
         }),
     ],
     module: {

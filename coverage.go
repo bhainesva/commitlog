@@ -437,16 +437,15 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 
 	sortedTests := config.sort(profilesByTest)
 
-	jobCacheChan <- Request{
-		Type: WRITE,
-		Payload: jobCacheEntry{
-			Complete: false,
-			Details:  "Constructing diffs",
-		},
-		Key: config.uuid,
-	}
-
 	for i, test := range sortedTests {
+		jobCacheChan <- Request{
+			Type: WRITE,
+			Payload: jobCacheEntry{
+				Complete: false,
+				Details:  fmt.Sprintf("Constructing diff %d of %d", i+1, len(sortedTests)),
+			},
+			Key: config.uuid,
+		}
 		profiles := profilesByTest[test]
 		activeProfiles, _ := mergeProfiles(prevProfiles, profiles)
 

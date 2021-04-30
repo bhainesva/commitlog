@@ -1,10 +1,17 @@
-.Error {
+.Toast {
     position: fixed;
     bottom: 20px;
     padding: 12px;
-    background-color: lightcoral;
     color: black;
     border-radius: 10px;
     left: 50%;
     transform: translateX(-50%);
+}
+
+.Toast--error {
+    background-color: lightcoral;
+}
+
+.Toast--success {
+    background-color: #bff7bf;
 }

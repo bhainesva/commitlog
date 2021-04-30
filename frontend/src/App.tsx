@@ -5,7 +5,10 @@ import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { DraggableList } from "./DraggableList"
 import './scss/LandingPage.scss';
-import './scss/Error.scss';
+import './scss/Toast.scss';
+import Toast, {ToastProps} from './Toast';
+import LandingPage from './LandingPage';
+import Page from './Page';
 import * as R from 'ramda'
 
 declare var Prism: any;
@@ -14,18 +17,9 @@ interface FileInfo {
   [key: string]: string
 }
 
-function ErrorToast(err: string) {
-  if (!err) return null;
-
-  return (
-    <div className="Error">
-      {err}
-    </div>
-  )
-}
-
 export default function App() {
-  const [error, setError] = useState('');
+  const [toast, setToast] = useState<ToastProps>();
+  const [loadingMessage, setLoadingMessage] = useState('Loading package list...');
   const [tests, setTests] = useState([]);
   const [packages, setPackages] = useState([]);
   const [files, setFiles] = useState<FileInfo[]>([]);
@@ -40,7 +34,8 @@ export default function App() {
 
   useEffect(() => {
     fetchPackages().then((data) => {
-      setPackages(data)
+      setPackages(data);
+      setLoadingMessage('');
     })
   }, [])
 
@@ -49,9 +44,20 @@ export default function App() {
     .then(r => r.json())
   }
 
-  const showErrorToast = (err: string) => {
-    setError(err)
-    setTimeout(() => setError(''), 3500)
+  const showErrorToast = (msg: string) => {
+    setToast({
+      msg: msg,
+      err: true,
+    });
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  const showSuccessToast = (msg: string) => {
+    setToast({
+      msg: msg,
+      err: false,
+    })
+    setTimeout(() => setToast(null), 3500)
   }
 
 
@@ -112,11 +118,23 @@ export default function App() {
     if (!R.contains(pkg, packages)) {
       showErrorToast(`Can't find package "${pkg}" please choose from the autocomplete!`)
     } else {
+      setLoadingMessage("Fetching tests...")
       const testNames = await fetchTestNames(pkg);
+      setLoadingMessage("")
       setActivePkg(pkg)
       setTests(testNames);
       setFiles([])
     }
+  }
+
+  function checkoutFiles() {
+    const data = fetch(`http://localhost:3000/checkout`, {
+      method: 'POST',
+      body: JSON.stringify({
+        files: files[activeTest],
+      })
+    })
+    .then(r => console.log(r.status))
   }
 
   async function checkJobStatus(id: string) {
@@ -124,15 +142,17 @@ export default function App() {
       .then(r => r.json())
 
     if (data.Complete) {
-      console.log("Job Complete! Updating files and tests")
+      showSuccessToast("Processing Finished!")
       setTests(data.Results.tests);
       setActiveTest(0);
+      setLoadingMessage('')
       setFiles(data.Results.files);
     } else {
       if (data.Error) {
+        showErrorToast("Job failed!: " + data.Error)
         console.error("Job failed!: ", data.Error)
       } else {
-        console.log("Current Status: ", data.Details)
+        setLoadingMessage(data.Details + '...')
         setTimeout(() => checkJobStatus(id), 300)
       }
     }
@@ -140,63 +160,74 @@ export default function App() {
 
   async function handleGenerateLogs(sortType: string) {
     fetchFiles(activePkg, tests, sortType).then(data => {
+      setLoadingMessage('Analyzing package...')
       checkJobStatus(data)
     })
   }
 
-  // Landing Page
-  if (tests.length === 0 && files.length === 0) {
-    return (
-      <div className="LandingPage">
-        {ErrorToast(error)}
-        {packages.length === 0 ?
-          <div>Loading...</div> : <PackagePicker packages={packages} onSubmit={handleSubmit} />
-        }
-      </div>
-    )
-  }
-
-  // Pkg selected, tests not ordered
-  if (files.length === 0) {
-    return (
-      <div className="TestOrdering">
-        <div className="Header">
-          <PackagePicker simple={true} packages={packages} onSubmit={handleSubmit} />
+  const pageContent = () => {
+    if (loadingMessage) {
+      return (
+        <div className="LandingPage">
+          <div>
+            {loadingMessage}
+          </div>
         </div>
-        {ErrorToast(error)}
-        <div>
-        Choose an automatic test ordering
-        <button onClick={() => handleGenerateLogs("raw")}>Generate with tests sorted by raw lines covered</button>
-        <button onClick={() => handleGenerateLogs("net")}>Generate with tests sorted by net lines covered</button>
-        <button onClick={() => handleGenerateLogs("importance")}>Generate with tests sorted by 'importance' heuristic</button>
-        </div>
+      )
+    }
 
-        Or manually order your tests
-        <button onClick={() => handleGenerateLogs("")}>Generate with this order</button>
-        <DndProvider backend={HTML5Backend}>
-          <DraggableList setItems={setTests} items={tests} />
-        </DndProvider>
-      </div>
+    if (tests.length === 0 && files.length === 0) {
+      return (
+        <LandingPage packages={packages} onSubmit={handleSubmit}/>
+      )
+    }
+
+    if (files.length === 0) {
+      return (
+        <div className="TestOrdering">
+          <div className="TestOrdering-auto">
+            <h2>Choose an automatic test ordering</h2>
+            <div>
+              <button onClick={() => handleGenerateLogs("raw")}>Generate with tests sorted by raw lines covered</button>
+              <button onClick={() => handleGenerateLogs("net")}>Generate with tests sorted by net lines covered</button>
+              <button onClick={() => handleGenerateLogs("importance")}>Generate with tests sorted by 'importance' heuristic*</button>
+            </div>
+
+            <div>*The heuristic works by computing a score for each line of the code, based on the number of tests that cover it. Tests are then ordered by the average score of the lines they cover</div>
+          </div>
+
+          <div className="TestOrdering-manual">
+            <h2>Or manually order your tests (click and drag to reorder)</h2>
+            <button onClick={() => handleGenerateLogs("")}>Generate with this order</button>
+            <DndProvider backend={HTML5Backend}>
+              <DraggableList setItems={setTests} items={tests} />
+            </DndProvider>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <>
+        <div className="TestBrowser">
+          <div className="TestBrowser-tests">
+            {tests.map((t, i) => <button key={i} name={t} className={i === activeTest ? 'is-active' : ''} onClick={() => setActiveTest(i)}>{t}</button>)}
+            <button className={tests.length == activeTest ? 'is-active' : ''} onClick={() => setActiveTest(tests.length)}>Final</button>
+
+            <button onClick={checkoutFiles}>Checkout Files</button>
+          </div>
+          <div className="TestBrowser-files">
+            {filesView()}
+          </div>
+        </div>
+      </>
     )
   }
 
   return (
-    <div>
-      <div className="Header">
-        <PackagePicker simple={true} packages={packages} onSubmit={handleSubmit} />
-      </div>
-      {ErrorToast(error)}
-      <br /><br />
-
-      <div className="Page">
-        <div className="Tests">
-          {tests.map((t, i) => <button key={i} name={t} className={i === activeTest ? 'is-active' : ''} onClick={() => setActiveTest(i)}>{t}</button>)}
-          <button className={tests.length == activeTest ? 'is-active' : ''} onClick={() => setActiveTest(tests.length)}>Final</button>
-        </div>
-        <div className="Files">
-          {filesView()}
-        </div>
-      </div>
-    </div>
+    <Page hidePicker={!activePkg} packages={packages} activePackage={activePkg} onSubmit={handleSubmit}>
+      {Toast(toast)}
+      {pageContent()}
+    </Page>
   )
 }

@@ -18,6 +18,7 @@ func main() {
 	}))
 
 	r.Get("/job/{id:[0-9a-zA-Z-]+}", commitlog.JobStatus)
+	r.Post("/checkout", commitlog.HandleCheckoutFiles)
 	r.Get("/listTests", commitlog.HandleTests)
 	r.Post("/listFiles", commitlog.HandleFiles)
 	r.Post("/listTestFiles", commitlog.HandleTestFiles)

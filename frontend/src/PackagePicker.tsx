@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import * as R from 'ramda';
 import {useCombobox} from 'downshift'
 import './scss/PackagePicker.scss';
+import classNames from "classnames";
 
 interface Props {
   packages: string[],
@@ -28,7 +29,7 @@ export default function PackagePicker(props: Props) {
     },
     onInputValueChange: ({inputValue}) => {
       setFilteredPackages(inputValue.length < 2 ? [] : 
-        R.take(10, packages.filter(item => item.toLowerCase().includes(inputValue.toLowerCase()))))
+        R.take(7, packages.filter(item => item.toLowerCase().includes(inputValue.toLowerCase()))))
     },
   })
 
@@ -49,17 +50,15 @@ export default function PackagePicker(props: Props) {
 
   return (
     <div className={className} {...getComboboxProps()}>
-      {!simple && <div className="PackagePicker-label">Choose a package</div>}
+      {!simple && <h1 className="PackagePicker-label">Choose a package</h1>}
       <form className="PackagePicker-form" onSubmit={(e) => {
           e.preventDefault();
           props.onSubmit(inputValue)}
         }>
           <input type="text" {...getInputProps()} className="PackagePicker-input" />
-            {isOpen && 
-              <ul className="Autocomplete" {...getMenuProps()}>
-                {autocompleteOptions}
-              </ul>
-            }
+            <ul className={classNames({'Autocomplete': true, 'u-hidden': !isOpen})} {...getMenuProps()}>
+              {isOpen && autocompleteOptions}
+            </ul>
         <button className="PackagePicker-submit">Go!</button>
       </form>
     </div>

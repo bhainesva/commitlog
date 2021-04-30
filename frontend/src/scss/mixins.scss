@@ -1,0 +1,10 @@
+@mixin button {
+    padding: 8px;
+    border: 1px solid black;
+    background-color: white;
+
+    &:hover,
+    &:focus {
+        background-color: aliceblue;
+    }
+}

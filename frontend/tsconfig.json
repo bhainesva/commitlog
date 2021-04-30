@@ -4,6 +4,7 @@
     "outDir": "./dist/",
     "noImplicitAny": true,
     "module": "es6",
+    "typeRoots" : ["node_modules/@types", "src/types"],
     "target": "es5",
     "jsx": "react",
     "allowJs": true,

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os/exec"
@@ -68,9 +69,32 @@ type filesRequest struct {
 	Sort  string   `json:"sort,omitempty"`
 }
 
+type checkoutRequest struct {
+	Files map[string][]byte `json:"files,omitempty""`
+}
+
 type filesResponse struct {
 	Tests []string            `json:"tests,omitempty"`
 	Files []map[string][]byte `json:"files,omitempty""`
+}
+
+func HandleCheckoutFiles(w http.ResponseWriter, r *http.Request) {
+	var req checkoutRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	for fn, content := range req.Files {
+		err := ioutil.WriteFile(fn, content, 0644)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	return
 }
 
 func HandleTestFiles(w http.ResponseWriter, r *http.Request) {
