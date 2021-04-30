@@ -3,7 +3,6 @@ backend:
 tmp files for coverage files / cleanup or something
 more algorithms to generate good test orders
 simplify testing flow
-multiple passes of deadcode
 run tests in parallel
 
 frontend:

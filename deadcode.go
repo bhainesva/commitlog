@@ -10,7 +10,8 @@ import (
 	"go/types"
 )
 
-func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators map[string]*decorator.Decorator) (map[string]*dst.File, error) {
+func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators map[string]*decorator.Decorator) (map[string]*dst.File, bool, error) {
+	codeDeleted := false
 	conf := types.Config{
 		Importer:         importer.Default(),
 		IgnoreFuncBodies: false,
@@ -107,6 +108,7 @@ func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators 
 						toDelete[parent] = struct{}{}
 						return false
 					} else { // delete just this identifier
+						codeDeleted = true
 						c.Delete()
 						return false
 					}
@@ -132,6 +134,7 @@ func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators 
 					toDelete[c.Parent()] = struct{}{}
 					return true
 				}
+				codeDeleted = true
 				c.Delete()
 			}
 
@@ -142,6 +145,7 @@ func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators 
 						toDelete[c.Parent()] = struct{}{}
 						return true
 					}
+					codeDeleted = true
 					c.Delete()
 				} else {
 					toDeleteParentType[c.Parent()] = struct{}{}
@@ -153,5 +157,5 @@ func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators 
 		outFiles[name] = newTree
 	}
 
-	return outFiles, nil
+	return outFiles, codeDeleted, nil
 }

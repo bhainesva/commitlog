@@ -458,9 +458,12 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 		}
 
 		// Parse package and kill dead code
-		undeadFiles, err := removeDeadCode(files, fset, ds)
+		undeadFiles, updated, err := removeDeadCode(files, fset, ds)
 		if err != nil {
 			return nil, nil, err
+		}
+		for updated != false {
+			undeadFiles, updated, err = removeDeadCode(files, fset, ds)
 		}
 
 		// Convert ASTs into []byte, get
