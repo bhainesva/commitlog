@@ -64,9 +64,9 @@ func TestMergeProfile(t *testing.T) {
 	//	},
 	//}
 
-	out := mergeProfiles(&p1, &p2)
-	fmt.Println("Length: ", len(out))
-	fmt.Printf("%#v", out[0])
+	//out := mergeProfiles(&p1, &p2)
+	fmt.Println(p1, p2)
+	//fmt.Printf("%#v", out[0])
 
 	if false {
 		t.Errorf("Oops")

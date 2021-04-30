@@ -415,7 +415,7 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 			Type: WRITE,
 			Payload: jobCacheEntry{
 				Complete: false,
-				Details:  fmt.Sprintf("Computing coverage for %d of %d tests", i, len(tests)),
+				Details:  fmt.Sprintf("Computing coverage for %d of %d tests", i+1, len(tests)),
 			},
 			Key: config.uuid,
 		}
