@@ -120,6 +120,11 @@ export default function App() {
     } else {
       setLoadingMessage("Fetching tests...")
       const testNames = await fetchTestNames(pkg);
+      if (!testNames) {
+        showErrorToast("That package has no tests!");
+        setLoadingMessage("")
+        return;
+      }
       setLoadingMessage("")
       setActivePkg(pkg)
       setTests(testNames);
