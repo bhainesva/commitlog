@@ -160,8 +160,10 @@ export default function App() {
   if (files.length === 0) {
     return (
       <div className="TestOrdering">
-        <PackagePicker packages={packages} onSubmit={handleSubmit} />
-        {error}
+        <div className="Header">
+          <PackagePicker simple={true} packages={packages} onSubmit={handleSubmit} />
+        </div>
+        {ErrorToast(error)}
         <div>
         Choose an automatic test ordering
         <button onClick={() => handleGenerateLogs("raw")}>Generate with tests sorted by raw lines covered</button>
@@ -180,16 +182,14 @@ export default function App() {
 
   return (
     <div>
-      <PackagePicker packages={packages} onSubmit={handleSubmit} />
-      {error}
+      <div className="Header">
+        <PackagePicker simple={true} packages={packages} onSubmit={handleSubmit} />
+      </div>
+      {ErrorToast(error)}
       <br /><br />
 
       <div className="Page">
         <div className="Tests">
-          <div>
-            Tests
-            ---------------
-          </div>
           {tests.map((t, i) => <button key={i} name={t} className={i === activeTest ? 'is-active' : ''} onClick={() => setActiveTest(i)}>{t}</button>)}
           <button className={tests.length == activeTest ? 'is-active' : ''} onClick={() => setActiveTest(tests.length)}>Final</button>
         </div>

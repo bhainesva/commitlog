@@ -6,12 +6,12 @@ import './scss/PackagePicker.scss';
 interface Props {
   packages: string[],
   onSubmit: (pkg: string) => void
-  modifier?: string,
+  simple?: boolean,
 }
 
 export default function PackagePicker(props: Props) {
   const [filteredPackages, setFilteredPackages] = useState([]);
-  const { packages, modifier, onSubmit } = props;
+  const { packages, simple, onSubmit } = props;
 
   const {
     isOpen,
@@ -32,7 +32,7 @@ export default function PackagePicker(props: Props) {
     },
   })
 
-  const className = modifier ? `PackagePicker PackagePicker--${modifier}` : "PackagePicker";
+  const className = simple ? `PackagePicker PackagePicker--simple` : "PackagePicker";
 
   const autocompleteOptions = filteredPackages.map((item, index) => (
     <li
@@ -49,7 +49,7 @@ export default function PackagePicker(props: Props) {
 
   return (
     <div className={className} {...getComboboxProps()}>
-      <div className="PackagePicker-label">Choose a package</div> 
+      {!simple && <div className="PackagePicker-label">Choose a package</div>}
       <form className="PackagePicker-form" onSubmit={(e) => {
           e.preventDefault();
           props.onSubmit(inputValue)}

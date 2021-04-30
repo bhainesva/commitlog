@@ -40,7 +40,14 @@
         box-shadow: 2px 5px 15px 5px aliceblue;
 
         &-option {
-            padding: 4px;
+            padding-left: 8px;
+            padding-right: 8px;
+            padding-top: 12px;
+            padding-bottom: 12px;
+
+            &:not(:last-child) {
+                border-bottom: 1px solid rgb(213, 222, 235);
+            }
         }
     }
 }

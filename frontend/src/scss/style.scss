@@ -12,6 +12,14 @@ body,
     margin: 0;
 }
 
+.Header {
+    display: flex;
+    height: 100px;
+    background-color: lightcyan;
+    justify-content: center;
+    align-items: center;
+}
+
 .Page {
     display: flex;
     align-items: flex-start;
@@ -20,6 +28,10 @@ body,
 .Tests {
     display: flex;
     flex-direction: column;
+
+    button {
+        padding: 8px;
+    }
 }
 
 .Tests button.is-active {
