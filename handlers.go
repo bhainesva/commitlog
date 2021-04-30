@@ -163,7 +163,6 @@ func HandleFiles(w http.ResponseWriter, r *http.Request) {
 				Key: id.String(),
 			}
 		} else {
-			log.Println("putting success in cache")
 			jobCacheChan <- Request{
 				Type: WRITE,
 				Payload: jobCacheEntry{
@@ -181,8 +180,6 @@ func HandleFiles(w http.ResponseWriter, r *http.Request) {
 }
 
 func jobOperation(id string, req filesRequest) (filesResponse, error) {
-	log.Println("Beginning job operation")
-
 	var sortFunc testSortingFunction
 	sortFunc = sortHardcodedOrder(req.Tests)
 	if req.Sort == "raw" {
@@ -193,8 +190,6 @@ func jobOperation(id string, req filesRequest) (filesResponse, error) {
 		sortFunc = sortTestsByImportance
 	}
 
-	log.Println("Computing file contents")
-	log.Println("Tests: ", req.Tests)
 	tests, fileContents, err := computeFileContentsByTest(computationConfig{
 		pkg:   req.Pkg,
 		tests: req.Tests,
@@ -204,7 +199,6 @@ func jobOperation(id string, req filesRequest) (filesResponse, error) {
 	if err != nil {
 		return filesResponse{}, err
 	}
-	log.Println("finished computing file contents")
 
 	return filesResponse{
 		Tests: tests,
