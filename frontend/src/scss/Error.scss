@@ -1,0 +1,10 @@
+.Error {
+    position: fixed;
+    top: 20px;
+    padding: 12px;
+    background-color: lightcoral;
+    color: black;
+    border-radius: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+}

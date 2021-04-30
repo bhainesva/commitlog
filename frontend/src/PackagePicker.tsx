@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from "react";
 import * as R from 'ramda';
 import {useCombobox} from 'downshift'
+import './scss/PackagePicker.scss';
 
 interface Props {
   packages: string[],
   onSubmit: (pkg: string) => void
+  modifier?: string,
 }
 
 export default function PackagePicker(props: Props) {
   const [filteredPackages, setFilteredPackages] = useState([]);
-  const { packages } = props;
+  const { packages, modifier, onSubmit } = props;
 
   const {
     isOpen,
@@ -22,7 +24,7 @@ export default function PackagePicker(props: Props) {
   } = useCombobox({
     items: filteredPackages,
     onSelectedItemChange: ({selectedItem}) => {
-      props.onSubmit(selectedItem);
+      onSubmit(selectedItem);
     },
     onInputValueChange: ({inputValue}) => {
       setFilteredPackages(inputValue.length < 2 ? [] : 
@@ -30,29 +32,35 @@ export default function PackagePicker(props: Props) {
     },
   })
 
+  const className = modifier ? `PackagePicker PackagePicker--${modifier}` : "PackagePicker";
+
+  const autocompleteOptions = filteredPackages.map((item, index) => (
+    <li
+      className="Autocomplete-option"
+      style={
+        highlightedIndex === index ? {backgroundColor: '#bde4ff'} : {}
+      }
+      key={`${item}${index}`}
+      {...getItemProps({item, index})}
+    >
+      {item}
+    </li>
+  ))
+
   return (
-    <div {...getComboboxProps()}>
-      <div>Pick a package</div> 
-      <form onSubmit={(e) => {
+    <div className={className} {...getComboboxProps()}>
+      <div className="PackagePicker-label">Choose a package</div> 
+      <form className="PackagePicker-form" onSubmit={(e) => {
           e.preventDefault();
           props.onSubmit(inputValue)}
         }>
-          <input type="text" {...getInputProps()} />
-          <ul className="Autocomplete" {...getMenuProps()}>
-            {isOpen &&
-              filteredPackages.map((item, index) => (
-                <li
-                  style={
-                    highlightedIndex === index ? {backgroundColor: '#bde4ff'} : {}
-                  }
-                  key={`${item}${index}`}
-                  {...getItemProps({item, index})}
-                >
-                  {item}
-                </li>
-              ))}
-          </ul>
-        <button>Go!</button>
+          <input type="text" {...getInputProps()} className="PackagePicker-input" />
+            {isOpen && 
+              <ul className="Autocomplete" {...getMenuProps()}>
+                {autocompleteOptions}
+              </ul>
+            }
+        <button className="PackagePicker-submit">Go!</button>
       </form>
     </div>
   )

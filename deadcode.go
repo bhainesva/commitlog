@@ -1,41 +1,57 @@
 package commitlog
 
 import (
-	"fmt"
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
 	"github.com/dave/dst/dstutil"
 	"go/ast"
+	"go/importer"
 	"go/token"
-	"golang.org/x/tools/go/packages"
+	"go/types"
 )
 
-func removeDeadCode(trees map[string]*dst.File, decorators map[string]*decorator.Decorator, pattern string) (map[string]*dst.File, error) {
-	fullFileByShortFile := map[string]string{}
-	conf := &packages.Config{
-		Mode: packages.NeedTypes | packages.NeedTypesInfo | packages.NeedSyntax,
-		ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
-			d := decorators[filename]
-			f := trees[filename]
-			fullFileByShortFile[d.Ast.Nodes[f].(*ast.File).Name.Name] = filename
-			return d.Ast.Nodes[f].(*ast.File), nil
-		},
+func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators map[string]*decorator.Decorator) (map[string]*dst.File, error) {
+	conf := types.Config{
+		Importer:         importer.Default(),
+		IgnoreFuncBodies: false,
+		Error:            func(error) {}, // Swallow errors
+	}
+	astByName := map[string]*ast.File{}
+	var asts []*ast.File
+
+	for fn, d := range decorators {
+		astFile := d.Ast.Nodes[trees[fn]].(*ast.File)
+		astByName[fn] = astFile
+		asts = append(asts, astFile)
 	}
 
-	pkgs, err := packages.Load(conf, pattern)
-	if err != nil {
-		return nil, err
+	livingDSTNodes := map[dst.Node]struct{}{}
+	livingPOS := map[token.Pos]struct{}{}
+	for fn, tree := range trees {
+		d := decorators[fn]
+		dst.Inspect(tree, func(n dst.Node) bool {
+			if n == nil {
+				return true
+			}
+
+			ast := d.Ast.Nodes[n]
+
+			livingDSTNodes[n] = struct{}{}
+			livingPOS[ast.Pos()] = struct{}{}
+			return true
+		})
 	}
 
-	if len(pkgs) != 1 {
-		return nil, fmt.Errorf("please only load 1 package")
+	typesInfo := types.Info{
+		Defs: make(map[*ast.Ident]types.Object),
+		Uses: make(map[*ast.Ident]types.Object),
 	}
-	pkg := pkgs[0]
+	conf.Check("", fset, asts, &typesInfo)
 
 	referencedTypePositions := map[token.Pos]struct{}{}
 	deletionCandidates := map[token.Pos]struct{}{}
 
-	for _, file := range pkg.Syntax {
+	for _, file := range astByName {
 		// Inspect the AST, mark identifiers for deletion that
 		// 1. Have a nil entry in TypesInfo.Uses
 		//                  AND
@@ -47,11 +63,14 @@ func removeDeadCode(trees map[string]*dst.File, decorators map[string]*decorator
 					return true
 				}
 
-				if usedObj, ok := pkg.TypesInfo.Uses[n]; ok {
-					referencedTypePositions[n.Pos()] = struct{}{}
-					delete(deletionCandidates, usedObj.Pos())
+				if usedObj, ok := typesInfo.Uses[n]; ok {
+					if _, ok := livingPOS[n.Pos()]; ok {
+						referencedTypePositions[usedObj.Pos()] = struct{}{}
+						delete(deletionCandidates, usedObj.Pos())
+					}
 				} else {
-					if _, ok := referencedTypePositions[n.Pos()]; !ok {
+					_, living := livingPOS[n.Pos()]
+					if _, ok := referencedTypePositions[n.Pos()]; !ok || !living {
 						deletionCandidates[n.Pos()] = struct{}{}
 					}
 				}
@@ -61,19 +80,18 @@ func removeDeadCode(trees map[string]*dst.File, decorators map[string]*decorator
 	}
 
 	outFiles := map[string]*dst.File{}
-	for _, file := range pkg.Syntax {
+	for name, file := range trees {
 		// Sometimes we realize we want to delete a node while
 		// visiting its children. These sets give information to the
 		// post func to take care of that on the way back up the tree
 		toDelete := map[dst.Node]struct{}{}
 		toDeleteParentType := map[dst.Node]struct{}{}
 
-		name := fullFileByShortFile[file.Name.Name]
-		f := trees[name]
+		//f := trees[name]
 		d := decorators[name]
 		// Traverse the AST a second time, deleting any identifiers
 		// marked for deletion in the first pass
-		newTree := dstutil.Apply(f, func(c *dstutil.Cursor) bool {
+		newTree := dstutil.Apply(file, func(c *dstutil.Cursor) bool {
 			if _, ok := c.Node().(*dst.Ident); ok {
 				astNode := d.Ast.Nodes[c.Node()]
 				if _, ok := deletionCandidates[astNode.Pos()]; !ok {

@@ -325,42 +325,41 @@ func post(deleteMap map[dst.Node]struct{}) func(cursor *dstutil.Cursor) bool {
 	}
 }
 
-func getStrippedFiles(profiles []*cover.Profile) (map[string]*dst.File, map[string]*decorator.Decorator, error) {
+func getStrippedFiles(profiles []*cover.Profile) (map[string]*dst.File, *token.FileSet, map[string]*decorator.Decorator, error) {
 	files := map[string]*dst.File{}
 	decorators := map[string]*decorator.Decorator{}
 
+	fset := token.NewFileSet()
 	for _, profile := range profiles {
-		tree, decorator, err := getStrippedFile(profile)
+		tree, d, err := getStrippedFile(fset, profile)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		absfp, err := findFile(profile.FileName)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
-		log.Println("fn: ", absfp)
 		files[absfp] = tree
-		decorators[absfp] = decorator
+		decorators[absfp] = d
 	}
 
-	return files, decorators, nil
+	return files, fset, decorators, nil
 }
 
-func getStrippedFile(profile *cover.Profile) (*dst.File, *decorator.Decorator, error) {
+func getStrippedFile(fset *token.FileSet, profile *cover.Profile) (*dst.File, *decorator.Decorator, error) {
 	p, err := findFile(profile.FileName)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	fSet := token.NewFileSet()
-	d := decorator.NewDecorator(fSet)
+	d := decorator.NewDecorator(fset)
 	f, err := d.ParseFile(p, nil, parser.ParseComments)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	toDelete := map[dst.Node]struct{}{}
-	newTree := dstutil.Apply(f, pre(fSet, profile, d.Map, toDelete), post(toDelete)).(*dst.File)
+	newTree := dstutil.Apply(f, pre(fset, profile, d.Map, toDelete), post(toDelete)).(*dst.File)
 	return newTree, d, nil
 }
 
@@ -453,13 +452,13 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 
 		contentsMap := map[string][]byte{}
 
-		files, decorators, err := getStrippedFiles(activeProfiles)
+		files, fset, ds, err := getStrippedFiles(activeProfiles)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		// Parse package and kill dead code
-		undeadFiles, err := removeDeadCode(files, decorators, pkg)
+		undeadFiles, err := removeDeadCode(files, fset, ds)
 		if err != nil {
 			return nil, nil, err
 		}

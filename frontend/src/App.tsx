@@ -4,6 +4,8 @@ import ReactDiffViewer from 'react-diff-viewer';
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import { DraggableList } from "./DraggableList"
+import './scss/LandingPage.scss';
+import './scss/Error.scss';
 import * as R from 'ramda'
 
 declare var Prism: any;
@@ -12,12 +14,18 @@ interface FileInfo {
   [key: string]: string
 }
 
-export const ItemTypes = {
-  TEST: 'test'
+function ErrorToast(err: string) {
+  if (!err) return null;
+
+  return (
+    <div className="Error">
+      {err}
+    </div>
+  )
 }
 
 export default function App() {
-  const [errorState, setErrorState] = useState('');
+  const [error, setError] = useState('');
   const [tests, setTests] = useState([]);
   const [packages, setPackages] = useState([]);
   const [files, setFiles] = useState<FileInfo[]>([]);
@@ -39,6 +47,11 @@ export default function App() {
   const fetchPackages = async () => {
     return fetch('http://localhost:3000/listPackages')
     .then(r => r.json())
+  }
+
+  const showErrorToast = (err: string) => {
+    setError(err)
+    setTimeout(() => setError(''), 3500)
   }
 
 
@@ -68,7 +81,6 @@ export default function App() {
   );
 
   const filesView = () => {
-    if (activeTest == -1) return 'Select a test to begin';
     const previousContents = activeTest === 0 ? {} : files[activeTest - 1];
     const contents = files[activeTest];
 
@@ -98,8 +110,7 @@ export default function App() {
 
   async function handleSubmit(pkg: string) {
     if (!R.contains(pkg, packages)) {
-      setErrorState('We don\'t recognize that package!');
-      setTimeout(() => setErrorState(''), 3000);
+      showErrorToast(`Can't find package "${pkg}" please choose from the autocomplete!`)
     } else {
       const testNames = await fetchTestNames(pkg);
       setActivePkg(pkg)
@@ -115,6 +126,7 @@ export default function App() {
     if (data.Complete) {
       console.log("Job Complete! Updating files and tests")
       setTests(data.Results.tests);
+      setActiveTest(0);
       setFiles(data.Results.files);
     } else {
       if (data.Error) {
@@ -136,10 +148,10 @@ export default function App() {
   if (tests.length === 0 && files.length === 0) {
     return (
       <div className="LandingPage">
+        {ErrorToast(error)}
         {packages.length === 0 ?
           <div>Loading...</div> : <PackagePicker packages={packages} onSubmit={handleSubmit} />
         }
-        {errorState}
       </div>
     )
   }
@@ -149,17 +161,19 @@ export default function App() {
     return (
       <div className="TestOrdering">
         <PackagePicker packages={packages} onSubmit={handleSubmit} />
-        {errorState}
+        {error}
         <div>
-          Order your tests man
-        </div>
-        <DndProvider backend={HTML5Backend}>
-          <DraggableList setItems={setTests} items={tests} />
-        </DndProvider>
-        <button onClick={() => handleGenerateLogs("")}>Generate with this order</button>
+        Choose an automatic test ordering
         <button onClick={() => handleGenerateLogs("raw")}>Generate with tests sorted by raw lines covered</button>
         <button onClick={() => handleGenerateLogs("net")}>Generate with tests sorted by net lines covered</button>
         <button onClick={() => handleGenerateLogs("importance")}>Generate with tests sorted by 'importance' heuristic</button>
+        </div>
+
+        Or manually order your tests
+        <button onClick={() => handleGenerateLogs("")}>Generate with this order</button>
+        <DndProvider backend={HTML5Backend}>
+          <DraggableList setItems={setTests} items={tests} />
+        </DndProvider>
       </div>
     )
   }
@@ -167,7 +181,7 @@ export default function App() {
   return (
     <div>
       <PackagePicker packages={packages} onSubmit={handleSubmit} />
-      {errorState}
+      {error}
       <br /><br />
 
       <div className="Page">

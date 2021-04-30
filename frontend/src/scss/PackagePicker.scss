@@ -1,0 +1,46 @@
+.PackagePicker {
+    width: 400px;
+
+    &-label {
+        font-size: 32px;
+        margin-bottom: 8px;
+    }
+
+    &-form {
+        position: relative;
+        display: flex;
+        height: 50px;
+    }
+
+    &-input {
+        flex-grow: 1;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        padding-left: 16px;
+        padding-right: 16px;
+        margin-right: 4px;
+        border: 1px solid black;
+    }
+
+    &-submit {
+        padding: 8px;
+        border: 1px solid black;
+
+        &:hover,
+        &:focus {
+            background-color: aliceblue;
+        }
+    }
+
+    .Autocomplete {
+        background-color: white;
+        top: 50px;
+        margin-top: 8px;
+        width: 100%;
+        box-shadow: 2px 5px 15px 5px aliceblue;
+
+        &-option {
+            padding: 4px;
+        }
+    }
+}
