@@ -17,11 +17,14 @@ func main() {
 		AllowedHeaders: []string{"Accept", "Content-Type"},
 	}))
 
-	r.Get("/job/{id:[0-9a-zA-Z-]+}", commitlog.JobStatus)
-	r.Post("/checkout", commitlog.HandleCheckoutFiles)
-	r.Get("/listTests", commitlog.HandleTests)
-	r.Post("/listFiles", commitlog.HandleFiles)
+	commitLogApp := commitlog.NewCommitLogApp()
+	commitLogHandler := commitlog.NewCommitlogHandler(commitLogApp)
+
+	r.Get("/job/{id:[0-9a-zA-Z-]+}", commitLogHandler.JobStatus)
+	r.Post("/checkout", commitLogHandler.HandleCheckoutFiles)
+	r.Get("/listTests", commitLogHandler.HandleTests)
+	r.Post("/listFiles", commitLogHandler.HandleFiles)
 	r.Post("/listTestFiles", commitlog.HandleTestFiles)
-	r.Get("/listPackages", commitlog.HandlePackages)
+	r.Get("/listPackages", commitLogHandler.HandlePackages)
 	http.ListenAndServe(":3000", r)
 }

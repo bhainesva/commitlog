@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import PackagePicker from "./PackagePicker";
+
 import ReactDiffViewer from 'react-diff-viewer';
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'

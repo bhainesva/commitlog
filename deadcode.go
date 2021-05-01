@@ -1,13 +1,14 @@
 package commitlog
 
 import (
-	"github.com/dave/dst"
-	"github.com/dave/dst/decorator"
-	"github.com/dave/dst/dstutil"
 	"go/ast"
 	"go/importer"
 	"go/token"
 	"go/types"
+
+	"github.com/dave/dst"
+	"github.com/dave/dst/decorator"
+	"github.com/dave/dst/dstutil"
 )
 
 func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators map[string]*decorator.Decorator) (map[string]*dst.File, bool, error) {

@@ -8,15 +8,15 @@ const (
 	DELETE
 )
 
-type Request struct {
+type CacheRequest struct {
 	Type    RequestType
-	Payload jobCacheEntry
+	Payload interface{}
 	Key     string
-	Out     chan Request
+	Out     chan CacheRequest
 }
 
-func Cache(ch chan Request) {
-	store := map[string]jobCacheEntry{}
+func NewCache(ch chan CacheRequest) {
+	store := map[string]interface{}{}
 
 	for req := range ch {
 		switch req.Type {
