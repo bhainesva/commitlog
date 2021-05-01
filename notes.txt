@@ -11,6 +11,14 @@ loading animations
 general styling
 
 Notes:
+doesn't handle:
+if x := funcWithSideEffect(); x {
+    // do somethiing
+}
+we delete the whole block. I think it's fine, in most case having the condition floating
+by itself would just be confusing
+
+
 thought just deleting uncovered lines would be enough but it wasn't because of how the weird { } cases
 work.
 

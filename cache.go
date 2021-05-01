@@ -1,22 +1,32 @@
 package commitlog
 
-type RequestType uint
+// Copied from: https://medium.com/@melvinodsa/building-a-high-performant-concurrent-cache-in-golang-b6442c20b2ca
+
+type requestType uint
 
 const (
-	READ RequestType = iota
+	READ requestType = iota
 	WRITE
 	DELETE
 )
 
-type Request struct {
-	Type    RequestType
-	Payload jobCacheEntry
-	Key     string
-	Out     chan Request
+func writeCacheEntry(ch chan cacheRequest, id string, entry interface{}) {
+	ch <- cacheRequest{
+		Type:    WRITE,
+		Payload: entry,
+		Key:     id,
+	}
 }
 
-func Cache(ch chan Request) {
-	store := map[string]jobCacheEntry{}
+type cacheRequest struct {
+	Type    requestType
+	Payload interface{}
+	Key     string
+	Out     chan cacheRequest
+}
+
+func initializeCache(ch chan cacheRequest) {
+	store := map[string]interface{}{}
 
 	for req := range ch {
 		switch req.Type {

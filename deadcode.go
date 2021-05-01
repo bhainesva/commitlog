@@ -10,67 +10,34 @@ import (
 	"go/types"
 )
 
-func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators map[string]*decorator.Decorator) (map[string]*dst.File, bool, error) {
-	codeDeleted := false
-	conf := types.Config{
-		Importer:         importer.Default(),
-		IgnoreFuncBodies: false,
-		Error:            func(error) {}, // Swallow errors
-	}
-	astByName := map[string]*ast.File{}
-	var asts []*ast.File
-
-	for fn, d := range decorators {
-		astFile := d.Ast.Nodes[trees[fn]].(*ast.File)
-		astByName[fn] = astFile
-		asts = append(asts, astFile)
-	}
-
-	livingDSTNodes := map[dst.Node]struct{}{}
-	livingPOS := map[token.Pos]struct{}{}
-	for fn, tree := range trees {
-		d := decorators[fn]
-		dst.Inspect(tree, func(n dst.Node) bool {
-			if n == nil {
-				return true
-			}
-
-			ast := d.Ast.Nodes[n]
-
-			livingDSTNodes[n] = struct{}{}
-			livingPOS[ast.Pos()] = struct{}{}
-			return true
-		})
-	}
-
-	typesInfo := types.Info{
-		Defs: make(map[*ast.Ident]types.Object),
-		Uses: make(map[*ast.Ident]types.Object),
-	}
-	conf.Check("", fset, asts, &typesInfo)
-
-	referencedTypePositions := map[token.Pos]struct{}{}
-	deletionCandidates := map[token.Pos]struct{}{}
+// findPositionsToDelete is a helper function that returns a set of unused identifiers.
+// It takes a map of asts by filename, a set of positions that contain active nodes
+// and a map with type usage information
+func findPositionsToDelete(astByName map[string]*ast.File, activePos map[token.Pos]struct{}, uses map[*ast.Ident]types.Object) map[token.Pos]struct{} {
+	var (
+		referencedTypePositions = map[token.Pos]struct{}{}
+		deletionCandidates = map[token.Pos]struct{}{}
+	)
 
 	for _, file := range astByName {
 		// Inspect the AST, mark identifiers for deletion that
-		// 1. Have a nil entry in TypesInfo.Uses
+		// 1. Have a nil entry in the typeinfo uses
 		//                  AND
 		// 2. Are not themselves referenced by any other Ident node through
-		//    TypesInfo.Uses
+		//    uses
 		ast.Inspect(file, func(n ast.Node) bool {
 			if n, ok := n.(*ast.Ident); ok {
 				if n.Name == "main" {
 					return true
 				}
 
-				if usedObj, ok := typesInfo.Uses[n]; ok {
-					if _, ok := livingPOS[n.Pos()]; ok {
+				if usedObj, ok := uses[n]; ok {
+					if _, ok := activePos[n.Pos()]; ok {
 						referencedTypePositions[usedObj.Pos()] = struct{}{}
 						delete(deletionCandidates, usedObj.Pos())
 					}
 				} else {
-					_, living := livingPOS[n.Pos()]
+					_, living := activePos[n.Pos()]
 					if _, ok := referencedTypePositions[n.Pos()]; !ok || !living {
 						deletionCandidates[n.Pos()] = struct{}{}
 					}
@@ -80,6 +47,58 @@ func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators 
 		})
 	}
 
+	return deletionCandidates
+}
+
+// removeDeadCode takes a map of dst Files by filename and returns a similar map with a
+// layer of dead code removed. It also returns a bool reporting whether any code was changed as
+// a result
+func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators map[string]*decorator.Decorator) (map[string]*dst.File, bool, error) {
+	var (
+		codeDeleted = false
+		astByName   = map[string]*ast.File{}
+		astFiles    []*ast.File
+		livingPOS = map[token.Pos]struct{}{}
+	)
+
+	for fn, d := range decorators {
+		astFile := d.Ast.Nodes[trees[fn]].(*ast.File)
+		astByName[fn] = astFile
+		astFiles = append(astFiles, astFile)
+	}
+
+	// The DSTs may have been manipulated but the ASTs stored in the decorator map
+	// are not updated to reflect that. This first pass figures out which AST nodes
+	// correspond to dst nodes that still exist in the tree, and records their positions.
+	for fn, tree := range trees {
+		d := decorators[fn]
+		dst.Inspect(tree, func(n dst.Node) bool {
+			if n == nil {
+				return true
+			}
+
+			ast := d.Ast.Nodes[n]
+
+			livingPOS[ast.Pos()] = struct{}{}
+			return true
+		})
+	}
+
+	conf := types.Config{
+		Importer:         importer.Default(),
+		IgnoreFuncBodies: false,
+		// Swallow errors, it's likely the input Files are invalid, for example
+		// because of unused imports remaining when uncovered code using them has been removed
+		Error:            func(error) {},
+	}
+	typesInfo := types.Info{
+		Defs: make(map[*ast.Ident]types.Object),
+		Uses: make(map[*ast.Ident]types.Object),
+	}
+	conf.Check("", fset, astFiles, &typesInfo)
+
+	deletionCandidates := findPositionsToDelete(astByName, livingPOS, typesInfo.Uses)
+
 	outFiles := map[string]*dst.File{}
 	for name, file := range trees {
 		// Sometimes we realize we want to delete a node while
@@ -88,7 +107,6 @@ func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators 
 		toDelete := map[dst.Node]struct{}{}
 		toDeleteParentType := map[dst.Node]struct{}{}
 
-		//f := trees[name]
 		d := decorators[name]
 		// Traverse the AST a second time, deleting any identifiers
 		// marked for deletion in the first pass
