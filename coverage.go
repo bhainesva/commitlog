@@ -67,68 +67,56 @@ func inUncoveredBlock(profile *cover.Profile, pos token.Position) bool {
 	return false
 }
 
-func mergeProfiles(profile1, profile2 *cover.Profile) int {
-	coverageGain := 0
+// mergeProfiles combines a set of new coverage profiles into a set of existing
+// coverage profiles. A profile block that is covered in any of the input profiles
+// will be covered in the output profiles. The function returns the new profiles, and
+// a number representing the net lines covered added by the new profiles.
+// This function makes some assumptions about the profiles. First that the codeblocks between
+// the different profiles have the same positions in the code. Second that multiplt new profiles
+// will not be provided for the same file. map[string]*cover.Profile might be a more representative
+// type, but less convenient.
+func mergeProfiles(existingProfiles, newProfiles []*cover.Profile) ([]*cover.Profile, int) {
 	type blockPos struct {
 		SCol, ECol, SLine, ELine int
 	}
+	var (
+		coverageGain           = 0
+		outProfiles            []*cover.Profile
+		existingProfilesByFile = map[string][]*cover.Profile{}
+		newProfilesByFile      = map[string][]*cover.Profile{}
+		filenames              = map[string]struct{}{}
+	)
 
-	blockByPos := map[blockPos]*cover.ProfileBlock{}
-	for _, block := range profile2.Blocks {
-		block := block
-		pos := blockPos{SCol: block.StartCol, ECol: block.EndCol, SLine: block.StartLine, ELine: block.EndLine}
-		if existingBlock, ok := blockByPos[pos]; ok {
-			if block.Count == 1 {
-				if existingBlock.Count == 1 {
-					coverageGain -= block.EndLine - block.StartLine
-				} else {
-					existingBlock.Count = 1
-				}
-			}
-		} else {
-			blockByPos[pos] = &block
-			if block.Count == 1 {
-				coverageGain += block.EndLine - block.StartLine
+	for _, profile := range existingProfiles {
+		existingProfilesByFile[profile.FileName] = append(existingProfilesByFile[profile.FileName], profile)
+		filenames[profile.FileName] = struct{}{}
+	}
+
+	for _, profile := range newProfiles {
+		newProfilesByFile[profile.FileName] = append(newProfilesByFile[profile.FileName], profile)
+		filenames[profile.FileName] = struct{}{}
+	}
+
+	for file, _ := range filenames {
+		blockByPos := map[blockPos]*cover.ProfileBlock{}
+		existingProfiles := existingProfilesByFile[file]
+		for _, profile := range existingProfiles {
+			for _, block := range profile.Blocks {
+				block := block
+				pos := blockPos{SCol: block.StartCol, ECol: block.EndCol, SLine: block.StartLine, ELine: block.EndLine}
+				blockByPos[pos] = &block
 			}
 		}
-	}
 
-	var blocks []cover.ProfileBlock
-	for _, block := range blockByPos {
-		blocks = append(blocks, *block)
-	}
-
-	return coverageGain
-}
-
-// TODO: the coverage calculation is suspicious here
-// doesn't actually distinguish between existing and new profiles
-// makes some assumptions that happen to be true
-func mergeAllProfiles(existingProfiles, newProfiles []*cover.Profile) ([]*cover.Profile, int) {
-	coverageGain := 0
-	type blockPos struct {
-		SCol, ECol, SLine, ELine int
-	}
-	profileByFiles := map[string][]*cover.Profile{}
-
-	for _, profile := range append(existingProfiles, newProfiles...) {
-		profileByFiles[profile.FileName] = append(profileByFiles[profile.FileName], profile)
-	}
-
-	var outProfiles []*cover.Profile
-
-	for file, fileProfiles := range profileByFiles {
-		blockByPos := map[blockPos]*cover.ProfileBlock{}
-		for _, profile := range fileProfiles {
-			profile := profile
+		newProfiles := newProfilesByFile[file]
+		for _, profile := range newProfiles {
 			for _, block := range profile.Blocks {
 				block := block
 				pos := blockPos{SCol: block.StartCol, ECol: block.EndCol, SLine: block.StartLine, ELine: block.EndLine}
 				if existingBlock, ok := blockByPos[pos]; ok {
 					if block.Count == 1 {
-						if existingBlock.Count == 1 {
-							coverageGain -= block.EndLine - block.StartLine
-						} else {
+						if existingBlock.Count == 0 {
+							coverageGain += block.EndLine - block.StartLine
 							existingBlock.Count = 1
 						}
 					}
@@ -155,16 +143,20 @@ func mergeAllProfiles(existingProfiles, newProfiles []*cover.Profile) ([]*cover.
 	return outProfiles, coverageGain
 }
 
+// uncoveredCodeDeletingApplication provides the context and helper methods
+// needed to use dst.Apply to traverse a DST and remove uncovered code
 type uncoveredCodeDeletingApplication struct {
-	fset      *token.FileSet
-	profile   *cover.Profile
-	m         decorator.Map
-	deleteMap map[dst.Node]struct{}
+	fset     *token.FileSet
+	profile  *cover.Profile
+	m        decorator.Map
+	toDelete map[dst.Node]struct{}
 }
 
 func (u *uncoveredCodeDeletingApplication) pre(cursor *dstutil.Cursor) bool {
 	node := cursor.Node()
 	astNode := u.m.Ast.Nodes[node]
+	// I don't know why the node might be non-nil while the astNode is nil,
+	// but it happens
 	if node == nil || astNode == nil {
 		return false
 	}
@@ -176,8 +168,8 @@ func (u *uncoveredCodeDeletingApplication) pre(cursor *dstutil.Cursor) bool {
 			return false
 		}
 
-		u.deleteMap[cursor.Parent()] = struct{}{}
-		return true
+		u.toDelete[cursor.Parent()] = struct{}{}
+		return false
 	}
 	return true
 }
@@ -186,7 +178,7 @@ func (u *uncoveredCodeDeletingApplication) post(cursor *dstutil.Cursor) bool {
 	if cursor.Node() == nil {
 		return true
 	}
-	if _, ok := u.deleteMap[cursor.Node()]; ok {
+	if _, ok := u.toDelete[cursor.Node()]; ok {
 		if cursor.Index() >= 0 {
 			cursor.Delete()
 			return true
@@ -198,10 +190,12 @@ func (u *uncoveredCodeDeletingApplication) post(cursor *dstutil.Cursor) bool {
 // constructUncoveredDSTs constructs DSTs from a list of code coverage profiles. It returns the DSTs in a map keyed by the
 // absolute filepath of the profiled file. It also returns a map of decorators with the same keys, and the fileset used.
 func constructUncoveredDSTs(profiles []*cover.Profile) (map[string]*dst.File, *token.FileSet, map[string]*decorator.Decorator, error) {
-	files := map[string]*dst.File{}
-	decorators := map[string]*decorator.Decorator{}
+	var (
+		files = map[string]*dst.File{}
+		fset = token.NewFileSet()
+		decorators = map[string]*decorator.Decorator{}
+	)
 
-	fset := token.NewFileSet()
 	for _, profile := range profiles {
 		tree, d, err := constructUncoveredDST(fset, profile)
 		if err != nil {
@@ -234,10 +228,10 @@ func constructUncoveredDST(fset *token.FileSet, profile *cover.Profile) (*dst.Fi
 	}
 
 	application := uncoveredCodeDeletingApplication{
-		fset:      fset,
-		profile:   profile,
-		m:         d.Map,
-		deleteMap: map[dst.Node]struct{}{},
+		fset:     fset,
+		profile:  profile,
+		m:        d.Map,
+		toDelete: map[dst.Node]struct{}{},
 	}
 	newTree := dstutil.Apply(f, application.pre, application.post).(*dst.File)
 	return newTree, d, nil

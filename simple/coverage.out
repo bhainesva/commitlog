@@ -1,0 +1,9 @@
+mode: set
+commitlog/simple/simple.go:20.36,23.22 2 1
+commitlog/simple/simple.go:27.2,27.28 1 1
+commitlog/simple/simple.go:23.22,25.3 1 1
+commitlog/simple/simple.go:31.42,33.19 2 0
+commitlog/simple/simple.go:36.2,41.28 3 0
+commitlog/simple/simple.go:45.2,45.17 1 0
+commitlog/simple/simple.go:33.19,35.3 1 0
+commitlog/simple/simple.go:41.28,43.3 1 0

@@ -1,12 +1,17 @@
 package simple
 
-import "strings"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 type Person struct {
 	Name     string // This is their normal name
 	Nickname string // You can call them this
 	Title    string // It's their title
 	Unused   LayeredUnused
+	Bint   int
 }
 
 type LayeredUnused string
@@ -28,6 +33,7 @@ func FormatProfessional(p Person) string {
 	if p.Title != "" {
 		suffix = p.Title + " " + suffix
 	}
+	fmt.Println(strconv.Itoa(p.Bint))
 
 	greeting := "Greetings, " + suffix
 

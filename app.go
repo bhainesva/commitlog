@@ -206,7 +206,7 @@ func (c *cla) computeFileContentsByTest(config computationConfig) ([]string, []m
 			Details:  fmt.Sprintf("Constructing diff %d of %d", i+1, len(sortedTests)),
 		})
 		profiles := profilesByTest[test]
-		activeProfiles, _ := mergeAllProfiles(prevProfiles, profiles)
+		activeProfiles, _ := mergeProfiles(prevProfiles, profiles)
 
 		contentsMap := map[string][]byte{}
 

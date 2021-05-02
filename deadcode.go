@@ -11,15 +11,24 @@ import (
 	"github.com/dave/dst/dstutil"
 )
 
+// removeDeadCode takes a map of dst files by filename and returns a similar map with a
+// layer of dead code removed. It also returns a bool reporting any code was changed as
+// a result
 func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators map[string]*decorator.Decorator) (map[string]*dst.File, bool, error) {
-	codeDeleted := false
+	var (
+		codeDeleted = false
+		astByName = map[string]*ast.File{}
+		asts []*ast.File
+	)
+
 	conf := types.Config{
 		Importer:         importer.Default(),
 		IgnoreFuncBodies: false,
-		Error:            func(error) {}, // Swallow errors
+		// Swallow errors, it's likely the input files are invalid, for example
+		// fur unused imports remaining when the using code has been removed
+		Error:            func(error) {},
+
 	}
-	astByName := map[string]*ast.File{}
-	var asts []*ast.File
 
 	for fn, d := range decorators {
 		astFile := d.Ast.Nodes[trees[fn]].(*ast.File)
@@ -27,8 +36,10 @@ func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators 
 		asts = append(asts, astFile)
 	}
 
-	livingDSTNodes := map[dst.Node]struct{}{}
-	livingPOS := map[token.Pos]struct{}{}
+	var (
+		livingDSTNodes = map[dst.Node]struct{}{}
+		livingPOS = map[token.Pos]struct{}{}
+	)
 	for fn, tree := range trees {
 		d := decorators[fn]
 		dst.Inspect(tree, func(n dst.Node) bool {
@@ -50,9 +61,11 @@ func removeDeadCode(trees map[string]*dst.File, fset *token.FileSet, decorators 
 	}
 	conf.Check("", fset, asts, &typesInfo)
 
-	referencedTypePositions := map[token.Pos]struct{}{}
-	deletionCandidates := map[token.Pos]struct{}{}
 
+	var (
+		referencedTypePositions = map[token.Pos]struct{}{}
+		deletionCandidates = map[token.Pos]struct{}{}
+	)
 	for _, file := range astByName {
 		// Inspect the AST, mark identifiers for deletion that
 		// 1. Have a nil entry in TypesInfo.Uses

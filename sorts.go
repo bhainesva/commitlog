@@ -54,7 +54,7 @@ func sortTestsByNewLinesCovered(testProfiles testProfileData) []string {
 		var minCoverage []*cover.Profile
 		for i, test := range tests {
 			profiles := testProfiles[test]
-			newCoverage, coverageGain := mergeAllProfiles(existingCoverage, profiles)
+			newCoverage, coverageGain := mergeProfiles(existingCoverage, profiles)
 			if minCoverageGain == 0 || coverageGain < minCoverageGain {
 				minTestIdx = i
 				minCoverageGain = coverageGain
