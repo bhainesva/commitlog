@@ -1,3 +1,5 @@
+@import 'mixins.scss';
+
 .Page {
   display: flex;
   flex-direction: column;
@@ -7,5 +9,19 @@
     padding: 16px;
     height: 100%;
     width: 100%;
+  }
+
+  &-infoButton {
+    @include button;
+
+    position: fixed;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    bottom: 15px;
+    right: 15px;
+    border-radius: 50%;
+    height: 20px;
+    width: 20px;
   }
 }
