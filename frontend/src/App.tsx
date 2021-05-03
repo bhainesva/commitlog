@@ -70,7 +70,7 @@ export default function App() {
         sort: sortType,
       })
     })
-      .then(r => r.text())
+      .then(r => r.json())
   }
 
   const toggleCollapse = (file: string) => {
@@ -148,10 +148,10 @@ export default function App() {
 
     if (data.Complete) {
       showSuccessToast("Processing Finished!")
-      setTests(data.Results.tests);
+      setTests(data.Results.Tests);
       setActiveTest(0);
       setLoadingMessage('')
-      setFiles(data.Results.files);
+      setFiles(data.Results.Files);
     } else {
       if (data.Error) {
         showErrorToast("Job failed!: " + data.Error)
@@ -166,7 +166,7 @@ export default function App() {
   async function handleGenerateLogs(sortType: string) {
     fetchFiles(activePkg, tests, sortType).then(data => {
       setLoadingMessage('Analyzing package...')
-      checkJobStatus(data)
+      checkJobStatus(data.id)
     })
   }
 

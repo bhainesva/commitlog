@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/dave/dst v0.26.2
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-chi/chi/v5 v5.0.2
 	github.com/go-chi/cors v1.2.0
 	github.com/google/uuid v1.2.0

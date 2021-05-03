@@ -19,8 +19,8 @@ type commitlogApp interface {
 }
 
 type cla struct {
-	testCoverageCache chan CacheRequest
-	jobCache          chan CacheRequest
+	testCoverageCache chan cacheRequest
+	jobCache          chan cacheRequest
 }
 
 type jobConfig struct {
@@ -30,8 +30,8 @@ type jobConfig struct {
 }
 
 type jobResult struct {
-	tests []string
-	files []map[string][]byte
+	Tests []string
+	Files []map[string][]byte
 }
 
 type jobCacheEntry struct {
@@ -39,14 +39,6 @@ type jobCacheEntry struct {
 	Details  string
 	Error    error
 	Results  jobResult
-}
-
-func writeCacheEntry(ch chan CacheRequest, id string, entry interface{}) {
-	ch <- CacheRequest{
-		Type:    WRITE,
-		Payload: entry,
-		Key:     id,
-	}
 }
 
 func (c *cla) writeJobCacheEntry(id string, entry jobCacheEntry) {
@@ -87,18 +79,22 @@ func (c *cla) WriteFiles(fileContent map[string][]byte) error {
 }
 
 func (c *cla) JobStatus(id string) (*jobCacheEntry, error) {
-	outCh := make(chan CacheRequest)
-	c.jobCache <- CacheRequest{
+	outCh := make(chan cacheRequest)
+	c.jobCache <- cacheRequest{
 		Type: READ,
 		Key:  id,
 		Out:  outCh,
 	}
 	info := <-outCh
-	val, ok := info.Payload.(*jobCacheEntry)
-	if !ok {
-		return nil, fmt.Errorf("unexpected payload type in job cache")
+	if info.Payload != nil {
+		val, ok := info.Payload.(jobCacheEntry)
+		if !ok {
+			return nil, fmt.Errorf("unexpected payload type in job cache: %#v", val)
+		}
+		return &val, nil
 	}
-	return val, nil
+
+	return nil, nil
 }
 
 func (c *cla) StartJob(conf jobConfig) string {
@@ -121,15 +117,15 @@ func (c *cla) StartJob(conf jobConfig) string {
 }
 
 func NewCommitLogApp() commitlogApp {
-	ch := make(chan CacheRequest)
-	NewCache(ch)
+	testCoverageChannel := make(chan cacheRequest)
+	go initializeCache(testCoverageChannel)
 
-	ch2 := make(chan CacheRequest)
-	NewCache(ch)
+	jobChannel := make(chan cacheRequest)
+	go initializeCache(jobChannel)
 
 	return &cla{
-		testCoverageCache: ch,
-		jobCache:          ch2,
+		testCoverageCache: testCoverageChannel,
+		jobCache:          jobChannel,
 	}
 }
 
@@ -155,8 +151,8 @@ func (c *cla) jobOperation(id string, conf jobConfig) (jobResult, error) {
 	}
 
 	return jobResult{
-		tests: tests,
-		files: fileContents,
+		Tests: tests,
+		Files: fileContents,
 	}, nil
 }
 
@@ -169,7 +165,7 @@ type computationConfig struct {
 
 // computeFileContentsByTest takes a package name and test ordering
 // and returns a map filename -> fileContents for each test, where the content
-// is what is covered by the tests up to that point in the ordering
+// is what is covered by the Tests up to that point in the ordering
 func (c *cla) computeFileContentsByTest(config computationConfig) ([]string, []map[string][]byte, error) {
 	pkg := config.pkg
 	tests := config.tests
@@ -183,9 +179,9 @@ func (c *cla) computeFileContentsByTest(config computationConfig) ([]string, []m
 	for i, test := range tests {
 		c.writeJobCacheEntry(config.uuid, jobCacheEntry{
 			Complete: false,
-			Details:  fmt.Sprintf("Computing coverage for %d of %d tests", i+1, len(tests)),
+			Details:  fmt.Sprintf("Computing coverage for %d of %d Tests", i+1, len(tests)),
 		})
-		profiles, err := c.getTestProfile(pkg, test)
+		profiles, err := c.getTestProfiles(pkg, test)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -210,7 +206,7 @@ func (c *cla) computeFileContentsByTest(config computationConfig) ([]string, []m
 
 		contentsMap := map[string][]byte{}
 
-		files, fset, ds, err := constructUncoveredDSTs(activeProfiles)
+		files, fset, ds, err := constructCoveredDSTs(activeProfiles)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -251,21 +247,23 @@ func (c *cla) computeFileContentsByTest(config computationConfig) ([]string, []m
 	return sortedTests, out, nil
 }
 
-func (c *cla) getTestProfile(pkg, test string) ([]*cover.Profile, error) {
-	outCh := make(chan CacheRequest)
-	c.testCoverageCache <- CacheRequest{
+func (c *cla) getTestProfiles(pkg, test string) ([]*cover.Profile, error) {
+	outCh := make(chan cacheRequest)
+	c.testCoverageCache <- cacheRequest{
 		Type: READ,
 		Key:  pkg + "-" + test,
 		Out:  outCh,
 	}
 	info := <-outCh
-	val, ok := info.Payload.([]*cover.Profile)
-	if !ok {
-		return nil, fmt.Errorf("unexpected payload type in test cache")
-	}
+	if info.Payload != nil {
+		val, ok := info.Payload.([]*cover.Profile)
+		if !ok {
+			return nil, fmt.Errorf("unexpected payload type in test cache: %#v", val)
+		}
 
-	if val != nil {
-		return val, nil
+		if val != nil {
+			return val, nil
+		}
 	}
 
 	profiles, err := gocmd.TestCover(pkg, test, "coverage.out")

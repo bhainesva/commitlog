@@ -11,7 +11,7 @@ type Person struct {
 	Nickname string // You can call them this
 	Title    string // It's their title
 	Unused   LayeredUnused
-	Bint   int
+	IntForImport   int
 }
 
 type LayeredUnused string
@@ -33,7 +33,7 @@ func FormatProfessional(p Person) string {
 	if p.Title != "" {
 		suffix = p.Title + " " + suffix
 	}
-	fmt.Println(strconv.Itoa(p.Bint))
+	fmt.Println(strconv.Itoa(p.IntForImport))
 
 	greeting := "Greetings, " + suffix
 

@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"log"
 	"net/http"
 )
 
@@ -26,5 +27,8 @@ func main() {
 	r.Post("/listFiles", commitLogHandler.HandleFiles)
 	r.Post("/listTestFiles", commitlog.HandleTestFiles)
 	r.Get("/listPackages", commitLogHandler.HandlePackages)
-	http.ListenAndServe(":3000", r)
+	err := http.ListenAndServe(":3000", r)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

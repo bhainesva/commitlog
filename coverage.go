@@ -72,9 +72,9 @@ func inUncoveredBlock(profile *cover.Profile, pos token.Position) bool {
 // will be covered in the output profiles. The function returns the new profiles, and
 // a number representing the net lines covered added by the new profiles.
 // This function makes some assumptions about the profiles. First that the codeblocks between
-// the different profiles have the same positions in the code. Second that multiplt new profiles
+// the different profiles have the same positions in the code. Second that multiple new profiles
 // will not be provided for the same file. map[string]*cover.Profile might be a more representative
-// type, but less convenient.
+// type, but less convenient. The Profiles/Blocks in the output are not necessarily ordered.
 func mergeProfiles(existingProfiles, newProfiles []*cover.Profile) ([]*cover.Profile, int) {
 	type blockPos struct {
 		SCol, ECol, SLine, ELine int
@@ -116,14 +116,14 @@ func mergeProfiles(existingProfiles, newProfiles []*cover.Profile) ([]*cover.Pro
 				if existingBlock, ok := blockByPos[pos]; ok {
 					if block.Count == 1 {
 						if existingBlock.Count == 0 {
-							coverageGain += block.EndLine - block.StartLine
+							coverageGain += 1 + block.EndLine - block.StartLine
 							existingBlock.Count = 1
 						}
 					}
 				} else {
 					blockByPos[pos] = &block
 					if block.Count == 1 {
-						coverageGain += block.EndLine - block.StartLine
+						coverageGain += 1 + block.EndLine - block.StartLine
 					}
 				}
 			}
@@ -187,9 +187,9 @@ func (u *uncoveredCodeDeletingApplication) post(cursor *dstutil.Cursor) bool {
 	return true
 }
 
-// constructUncoveredDSTs constructs DSTs from a list of code coverage profiles. It returns the DSTs in a map keyed by the
+// constructCoveredDSTs constructs DSTs from a list of code coverage profiles. It returns the DSTs in a map keyed by the
 // absolute filepath of the profiled file. It also returns a map of decorators with the same keys, and the fileset used.
-func constructUncoveredDSTs(profiles []*cover.Profile) (map[string]*dst.File, *token.FileSet, map[string]*decorator.Decorator, error) {
+func constructCoveredDSTs(profiles []*cover.Profile) (map[string]*dst.File, *token.FileSet, map[string]*decorator.Decorator, error) {
 	var (
 		files = map[string]*dst.File{}
 		fset = token.NewFileSet()
@@ -197,7 +197,18 @@ func constructUncoveredDSTs(profiles []*cover.Profile) (map[string]*dst.File, *t
 	)
 
 	for _, profile := range profiles {
-		tree, d, err := constructUncoveredDST(fset, profile)
+		p, err := findFile(profile.FileName)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		d := decorator.NewDecorator(fset)
+		dstFile, err := d.ParseFile(p, nil, parser.ParseComments)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		tree, err := constructCoveredDST(fset, profile, dstFile, d)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -212,27 +223,16 @@ func constructUncoveredDSTs(profiles []*cover.Profile) (map[string]*dst.File, *t
 	return files, fset, decorators, nil
 }
 
-// constructUncoveredDST constructs a DST containing the contents of the covered portion
+// constructCoveredDST constructs a DST containing the contents of the covered/untracked portions
 // of a code coverage profile. It also returns the decorator used, in case the caller needs to
 // reference the Dst/Ast maps it contains.
-func constructUncoveredDST(fset *token.FileSet, profile *cover.Profile) (*dst.File, *decorator.Decorator, error) {
-	p, err := findFile(profile.FileName)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	d := decorator.NewDecorator(fset)
-	f, err := d.ParseFile(p, nil, parser.ParseComments)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func constructCoveredDST(fset *token.FileSet, profile *cover.Profile, dstFile *dst.File, dec *decorator.Decorator) (*dst.File, error) {
 	application := uncoveredCodeDeletingApplication{
 		fset:     fset,
 		profile:  profile,
-		m:        d.Map,
+		m:        dec.Map,
 		toDelete: map[dst.Node]struct{}{},
 	}
-	newTree := dstutil.Apply(f, application.pre, application.post).(*dst.File)
-	return newTree, d, nil
+	newTree := dstutil.Apply(dstFile, application.pre, application.post).(*dst.File)
+	return newTree, nil
 }

@@ -85,10 +85,10 @@ func HandleTestFiles(w http.ResponseWriter, r *http.Request) {
 			},
 			{
 				Files: map[string][]byte{
-					"file/number/one.go":   []byte("Now the files are happy"),
+					"file/number/one.go":   []byte("Now the Files are happy"),
 					"file/number/two.go":   []byte("This is their true form"),
 					"file/number/three.go": []byte("I told you they could do it"),
-					"file/number/four.go":  []byte("Yay for the files"),
+					"file/number/four.go":  []byte("Yay for the Files"),
 				},
 			},
 		},
