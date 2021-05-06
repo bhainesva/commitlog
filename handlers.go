@@ -2,15 +2,25 @@ package commitlog
 
 import (
 	"commitlog/api"
-	"commitlog/gocmd"
 	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
 
-type commitlogHandler struct {
-	app commitlogApp
+type goPackageInfoProvider interface {
+	List() ([]string, error)
+	ListTests(pkg string) ([]string, error)
+}
+
+type jobManager interface {
+	StartJob(jobConfig) string
+	JobStatus(string) (*jobCacheEntry, error)
+}
+
+type Handler struct {
+	Jobs jobManager
+	GoInfo goPackageInfoProvider
 }
 
 func respondWithJSON(w http.ResponseWriter, content interface{}) {
@@ -24,14 +34,8 @@ func respondWithJSON(w http.ResponseWriter, content interface{}) {
 	return
 }
 
-func NewCommitlogHandler(app commitlogApp) commitlogHandler {
-	return commitlogHandler{
-		app: app,
-	}
-}
-
-func (c *commitlogHandler) HandlePackages(w http.ResponseWriter, r *http.Request) {
-	output, err := gocmd.List()
+func (c *Handler) HandlePackages(w http.ResponseWriter, r *http.Request) {
+	output, err := c.GoInfo.List()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -40,9 +44,9 @@ func (c *commitlogHandler) HandlePackages(w http.ResponseWriter, r *http.Request
 	respondWithJSON(w, output)
 }
 
-func (c *commitlogHandler) HandleTests(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) HandleTests(w http.ResponseWriter, r *http.Request) {
 	pkg := r.URL.Query().Get("pkg")
-	tests, err := c.app.ListTests(pkg)
+	tests, err := c.GoInfo.ListTests(pkg)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -51,7 +55,7 @@ func (c *commitlogHandler) HandleTests(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, tests)
 }
 
-func (c *commitlogHandler) HandleCheckoutFiles(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) HandleCheckoutFiles(w http.ResponseWriter, r *http.Request) {
 	var req api.CheckoutFilesRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -59,53 +63,13 @@ func (c *commitlogHandler) HandleCheckoutFiles(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	c.app.WriteFiles(req.GetFiles().GetFiles())
+	WriteFiles(req.GetFiles().GetFiles())
 	return
 }
 
-func HandleTestFiles(w http.ResponseWriter, r *http.Request) {
-	resp := api.JobResults{
-		Tests: []string{"Test1", "Test2", "Test3"},
-		Files: []*api.FileMap{
-			{
-				Files: map[string][]byte{
-					"file/number/one.go":   []byte("Here is some file content"),
-					"file/number/two.go":   []byte("Here is some file content"),
-					"file/number/three.go": []byte("Here is some file content"),
-					"file/number/four.go":  []byte("Here is some file content"),
-				},
-			},
-			{
-				Files: map[string][]byte{
-					"file/number/one.go":   []byte("The content changes"),
-					"file/number/two.go":   []byte("As we all do"),
-					"file/number/three.go": []byte("oh no"),
-					"file/number/four.go":  []byte("Big things ahead"),
-				},
-			},
-			{
-				Files: map[string][]byte{
-					"file/number/one.go":   []byte("Now the Files are happy"),
-					"file/number/two.go":   []byte("This is their true form"),
-					"file/number/three.go": []byte("I told you they could do it"),
-					"file/number/four.go":  []byte("Yay for the Files"),
-				},
-			},
-		},
-	}
-
-	js, err := json.Marshal(resp)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	w.Write(js)
-}
-
-func (c *commitlogHandler) JobStatus(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) JobStatus(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	status, err := c.app.JobStatus(id)
+	status, err := c.Jobs.JobStatus(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -114,7 +78,7 @@ func (c *commitlogHandler) JobStatus(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, status)
 }
 
-func (c *commitlogHandler) HandleFiles(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	var req api.FetchFilesRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -122,7 +86,7 @@ func (c *commitlogHandler) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := c.app.StartJob(jobConfig{
+	id := c.Jobs.StartJob(jobConfig{
 		pkg:   req.GetPkg(),
 		tests: req.GetTests(),
 		sort:  req.GetSort(),

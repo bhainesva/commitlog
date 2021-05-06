@@ -10,15 +10,7 @@ import (
 	"io/ioutil"
 )
 
-type commitlogApp interface {
-	ListPackages() ([]string, error)
-	ListTests(string) ([]string, error)
-	JobStatus(string) (*jobCacheEntry, error)
-	WriteFiles(map[string][]byte) error
-	StartJob(jobConfig) string
-}
-
-type cla struct {
+type commitlogApp struct {
 	testCoverageCache chan cacheRequest
 	jobCache          chan cacheRequest
 }
@@ -41,44 +33,25 @@ type jobCacheEntry struct {
 	Results  jobResult
 }
 
-func (c *cla) writeJobCacheEntry(id string, entry jobCacheEntry) {
+func (c *commitlogApp) writeJobCacheEntry(id string, entry jobCacheEntry) {
 	writeCacheEntry(c.jobCache, id, entry)
 }
 
-func (c *cla) finishJobWithError(id string, err error) {
+func (c *commitlogApp) finishJobWithError(id string, err error) {
 	c.writeJobCacheEntry(id, jobCacheEntry{
 		Complete: true,
 		Error:    err,
 	})
 }
 
-func (c *cla) updateInProgressJobStatus(id, details string) {
+func (c *commitlogApp) updateInProgressJobStatus(id, details string) {
 	c.writeJobCacheEntry(id, jobCacheEntry{
 		Complete: false,
 		Details:  details,
 	})
 }
 
-func (c *cla) ListPackages() ([]string, error) {
-	return gocmd.List()
-}
-
-func (c *cla) ListTests(pkg string) ([]string, error) {
-	return gocmd.TestList(pkg)
-}
-
-func (c *cla) WriteFiles(fileContent map[string][]byte) error {
-	for fn, content := range fileContent {
-		err := ioutil.WriteFile(fn, content, 0644)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (c *cla) JobStatus(id string) (*jobCacheEntry, error) {
+func (c *commitlogApp) JobStatus(id string) (*jobCacheEntry, error) {
 	outCh := make(chan cacheRequest)
 	c.jobCache <- cacheRequest{
 		Type: READ,
@@ -97,7 +70,7 @@ func (c *cla) JobStatus(id string) (*jobCacheEntry, error) {
 	return nil, nil
 }
 
-func (c *cla) StartJob(conf jobConfig) string {
+func (c *commitlogApp) StartJob(conf jobConfig) string {
 	id := uuid.New()
 	c.updateInProgressJobStatus(id.String(), "Initializing job")
 
@@ -116,20 +89,20 @@ func (c *cla) StartJob(conf jobConfig) string {
 	return id.String()
 }
 
-func NewCommitLogApp() commitlogApp {
+func NewCommitLogApp() *commitlogApp {
 	testCoverageChannel := make(chan cacheRequest)
 	go initializeCache(testCoverageChannel)
 
 	jobChannel := make(chan cacheRequest)
 	go initializeCache(jobChannel)
 
-	return &cla{
+	return &commitlogApp{
 		testCoverageCache: testCoverageChannel,
 		jobCache:          jobChannel,
 	}
 }
 
-func (c *cla) jobOperation(id string, conf jobConfig) (jobResult, error) {
+func (c *commitlogApp) jobOperation(id string, conf jobConfig) (jobResult, error) {
 	var sortFunc testSortingFunction
 	sortFunc = sortHardcodedOrder(conf.tests)
 	if conf.sort == "raw" {
@@ -166,7 +139,7 @@ type computationConfig struct {
 // computeFileContentsByTest takes a package name and test ordering
 // and returns a map filename -> fileContents for each test, where the content
 // is what is covered by the Tests up to that point in the ordering
-func (c *cla) computeFileContentsByTest(config computationConfig) ([]string, []map[string][]byte, error) {
+func (c *commitlogApp) computeFileContentsByTest(config computationConfig) ([]string, []map[string][]byte, error) {
 	pkg := config.pkg
 	tests := config.tests
 
@@ -247,7 +220,7 @@ func (c *cla) computeFileContentsByTest(config computationConfig) ([]string, []m
 	return sortedTests, out, nil
 }
 
-func (c *cla) getTestProfiles(pkg, test string) ([]*cover.Profile, error) {
+func (c *commitlogApp) getTestProfiles(pkg, test string) ([]*cover.Profile, error) {
 	outCh := make(chan cacheRequest)
 	c.testCoverageCache <- cacheRequest{
 		Type: READ,

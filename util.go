@@ -3,6 +3,7 @@ package commitlog
 import (
 	"fmt"
 	"go/build"
+	"io/ioutil"
 	"path/filepath"
 )
 
@@ -18,3 +19,15 @@ func findFile(file string) (string, error) {
 	}
 	return filepath.Join(pkg.Dir, file), nil
 }
+
+func WriteFiles(fileContent map[string][]byte) error {
+	for fn, content := range fileContent {
+		err := ioutil.WriteFile(fn, content, 0644)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+

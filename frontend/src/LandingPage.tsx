@@ -14,6 +14,10 @@ export default function LandingPage(props: Props) {
   return (
     <div className="LandingPage">
       <PackagePicker packages={packages} onSubmit={onSubmit} />
+
+      <div className="LandingPage-message">
+        To use a package not visible here, `go get` it and then import it into cmd/commitlog-server/imports.go
+      </div>
     </div>
   )
 }
