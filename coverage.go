@@ -189,7 +189,7 @@ func (u *uncoveredCodeDeletingApplication) post(cursor *dstutil.Cursor) bool {
 
 // constructCoveredDSTs constructs DSTs from a list of code coverage profiles. It returns the DSTs in a map keyed by the
 // absolute filepath of the profiled file. It also returns a map of decorators with the same keys, and the fileset used.
-func constructCoveredDSTs(profiles []*cover.Profile) (map[string]*dst.File, *token.FileSet, map[string]*decorator.Decorator, error) {
+func constructCoveredDSTs(profiles []*cover.Profile, pkg string) (map[string]*dst.File, *token.FileSet, map[string]*decorator.Decorator, error) {
 	var (
 		files = map[string]*dst.File{}
 		fset = token.NewFileSet()
@@ -197,7 +197,7 @@ func constructCoveredDSTs(profiles []*cover.Profile) (map[string]*dst.File, *tok
 	)
 
 	for _, profile := range profiles {
-		p, err := findFile(profile.FileName)
+		p, err := findFile(profile.FileName, pkg)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -212,12 +212,8 @@ func constructCoveredDSTs(profiles []*cover.Profile) (map[string]*dst.File, *tok
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		absfp, err := findFile(profile.FileName)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		files[absfp] = tree
-		decorators[absfp] = d
+		files[p] = tree
+		decorators[p] = d
 	}
 
 	return files, fset, decorators, nil

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/build"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 )
 
@@ -11,10 +12,21 @@ import (
 // It returns the absolute path of a file given its package relative
 // location.
 // Ex:commitlog/simple/simple.go -> /Users/bhaines/repo/commitlog/simple/simple.go
-func findFile(file string) (string, error) {
-	dir, file := filepath.Split(file)
+func findFile(path string, pack string) (string, error) {
+	if filepath.IsAbs(path) {
+		return path, nil
+	}
+	dir, file := filepath.Split(path)
 	pkg, err := build.Import(dir, ".", build.FindOnly)
 	if err != nil {
+		gp := os.Getenv("GOPATH")
+		if _, err := os.Stat(filepath.Join(pack, file)); err == nil || !os.IsNotExist(err) {
+			return filepath.Join(pack, file), nil
+		} else {
+			if _, err := os.Stat(filepath.Join(gp, "src", path)); err == nil || !os.IsNotExist(err) {
+				return filepath.Join(gp, "src", path), nil
+			}
+		}
 		return "", fmt.Errorf("can't find %q: %v", file, err)
 	}
 	return filepath.Join(pkg.Dir, file), nil

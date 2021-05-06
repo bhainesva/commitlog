@@ -115,8 +115,8 @@ export default function App() {
 
 
   async function handleSubmit(pkg: string) {
-    if (!R.contains(pkg, packages)) {
-      showErrorToast(`Can't find package "${pkg}" please choose from the autocomplete!`)
+    if (!R.contains(pkg, packages) && !pkg.startsWith("/")) {
+      showErrorToast(`Can't find package "${pkg}" please choose from the autocomplete, or provide an absolute path`)
     } else {
       setLoadingMessage("Fetching tests...")
       const testNames = await fetchTestNames(pkg);

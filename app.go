@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/tools/cover"
 	"io/ioutil"
+	"log"
 )
 
 type commitlogApp struct {
@@ -29,7 +30,7 @@ type jobResult struct {
 type jobCacheEntry struct {
 	Complete bool
 	Details  string
-	Error    error
+	Error    string
 	Results  jobResult
 }
 
@@ -40,7 +41,7 @@ func (c *commitlogApp) writeJobCacheEntry(id string, entry jobCacheEntry) {
 func (c *commitlogApp) finishJobWithError(id string, err error) {
 	c.writeJobCacheEntry(id, jobCacheEntry{
 		Complete: true,
-		Error:    err,
+		Error:    err.Error(),
 	})
 }
 
@@ -168,6 +169,7 @@ func (c *commitlogApp) computeFileContentsByTest(config computationConfig) ([]st
 	})
 
 	sortedTests := config.sort(profilesByTest)
+	log.Println("got sorted tests: ", sortedTests)
 
 	for i, test := range sortedTests {
 		c.writeJobCacheEntry(config.uuid, jobCacheEntry{
@@ -179,11 +181,13 @@ func (c *commitlogApp) computeFileContentsByTest(config computationConfig) ([]st
 
 		contentsMap := map[string][]byte{}
 
-		files, fset, ds, err := constructCoveredDSTs(activeProfiles)
+		log.Println("constructing dsts")
+		files, fset, ds, err := constructCoveredDSTs(activeProfiles, pkg)
 		if err != nil {
 			return nil, nil, err
 		}
 
+		log.Println("removing dead code")
 		// Parse package and kill dead code
 		undeadFiles, updated, err := removeDeadCode(files, fset, ds)
 		if err != nil {
@@ -191,8 +195,12 @@ func (c *commitlogApp) computeFileContentsByTest(config computationConfig) ([]st
 		}
 		for updated != false {
 			undeadFiles, updated, err = removeDeadCode(files, fset, ds)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 
+		log.Println("turning dsts to []bytes")
 		// Convert ASTs into []byte, get
 		for name, tree := range undeadFiles {
 			var buf bytes.Buffer
@@ -205,6 +213,7 @@ func (c *commitlogApp) computeFileContentsByTest(config computationConfig) ([]st
 			contentsMap[name] = buf.Bytes()
 
 			if _, ok := finalContentsMap[name]; !ok {
+				log.Println("loading final contents for", name)
 				fullFileData, err := ioutil.ReadFile(name)
 				if err != nil {
 					return nil, nil, err
