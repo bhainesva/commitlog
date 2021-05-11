@@ -8,6 +8,7 @@ import (
 	"go/importer"
 	"go/token"
 	"go/types"
+	"log"
 )
 
 // findPositionsToDelete is a helper function that returns a set of unused identifiers.
@@ -19,6 +20,18 @@ func findPositionsToDelete(astByName map[string]*ast.File, activePos map[token.P
 		deletionCandidates = map[token.Pos]struct{}{}
 	)
 
+	markParamsAsUsed := func(fields []*ast.Field) {
+		for _, field := range fields {
+			if fun, ok :=  field.Type.(*ast.FuncType); ok {
+				for _, param := range fun.Params.List {
+					for _, paramName := range param.Names {
+						referencedTypePositions[paramName.Pos()] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+
 	for _, file := range astByName {
 		// Inspect the AST, mark identifiers for deletion that
 		// 1. Have a nil entry in the typeinfo uses
@@ -26,6 +39,23 @@ func findPositionsToDelete(astByName map[string]*ast.File, activePos map[token.P
 		// 2. Are not themselves referenced by any other Ident node through
 		//    uses
 		ast.Inspect(file, func(n ast.Node) bool {
+			// Edge Cases
+			// Too hard to check if implementers of an interface use all the params the method is specified to take
+			// just leave them all in
+			if n, ok := n.(*ast.InterfaceType); ok {
+				markParamsAsUsed(n.Methods.List)
+			}
+			// Similarly, when a function takes a function argument, it would be difficult to
+			// tell if the function passed actually uses the arguments that it takes. Leave them all in
+			if n, ok := n.(*ast.FuncDecl); ok {
+				markParamsAsUsed(n.Type.Params.List)
+			}
+			// We still strip unused params from function declarations in general
+			// This is useful because it can allow you to remove the whole
+			// type definition if it's otherwise unused.
+			// However, if the function is intended to implement an interface, and some params are just unneeded
+			// for the particular implementation, then it might lead to confusing / invalid code when they're stripped
+
 			if n, ok := n.(*ast.Ident); ok {
 				if n.Name == "main" {
 					return true
