@@ -8,7 +8,6 @@ import (
 	"go/importer"
 	"go/token"
 	"go/types"
-	"log"
 )
 
 // findPositionsToDelete is a helper function that returns a set of unused identifiers.

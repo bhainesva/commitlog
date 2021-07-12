@@ -1,14 +1,15 @@
 TODO:
+general:
+error page when job fails
+
 backend:
 tmp files for coverage files / cleanup or something
 more algorithms to generate good test orders
 simplify testing flow
 run tests in parallel
+make theoretically language independent
 
 frontend:
-error messages for missing package
-loading animations
-general styling
 
 Notes:
 doesn't handle:
@@ -22,7 +23,7 @@ by itself would just be confusing
 thought just deleting uncovered lines would be enough but it wasn't because of how the weird { } cases
 work.
 
-there is something weird w/ dst
+I don't understand dst
 	r := decorator.NewRestorer()
 	r.Fprint(fi, ntree)
 

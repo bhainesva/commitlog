@@ -1,3 +1,4 @@
+// Package gocmd provides a wrapper for interacting with the go cmd line tool
 package gocmd
 
 import (
@@ -65,7 +66,6 @@ var (
 // If it cannot find a module path, it returns an empty string.
 // It is tolerant of unrelated problems in the go.mod file.
 //
-// Copied from cmd/go/internal/modfile.
 // Copied from cmd/go/internal/modfile.
 func modulePath(mod []byte) string {
 	for len(mod) > 0 {
