@@ -1,26 +1,26 @@
-package commitlog
+package cache
 
 import (
 	"testing"
 )
 
 func TestCacheWriteThenRead(t *testing.T) {
-	ch := make(chan cacheRequest)
-	go initializeCache(ch)
+	ch := make(chan Request)
+	go Initialize(ch)
 	expectedValue := "test"
 	key := "key"
 
-	ch <- cacheRequest{
+	ch <- Request{
 		Type:    WRITE,
 		Payload: expectedValue,
-		Key: key,
+		Key:     key,
 	}
 
-	out := make(chan cacheRequest)
-	ch <- cacheRequest{
-		Type:    READ,
-		Key:     key,
-		Out: out,
+	out := make(chan Request)
+	ch <- Request{
+		Type: READ,
+		Key:  key,
+		Out:  out,
 	}
 
 	got := <-out
@@ -34,18 +34,18 @@ func TestCacheWriteThenRead(t *testing.T) {
 }
 
 func TestCacheWriteHelper(t *testing.T) {
-	ch := make(chan cacheRequest)
-	go initializeCache(ch)
+	ch := make(chan Request)
+	go Initialize(ch)
 	key := "key"
 	expectedValue := "test"
 
-	writeCacheEntry(ch, key, expectedValue)
+	WriteEntry(ch, key, expectedValue)
 
-	out := make(chan cacheRequest)
-	ch <- cacheRequest{
-		Type:    READ,
-		Key:    key,
-		Out: out,
+	out := make(chan Request)
+	ch <- Request{
+		Type: READ,
+		Key:  key,
+		Out:  out,
 	}
 
 	got := <-out
@@ -59,14 +59,14 @@ func TestCacheWriteHelper(t *testing.T) {
 }
 
 func TestCacheReadEmpty(t *testing.T) {
-	ch := make(chan cacheRequest)
-	go initializeCache(ch)
+	ch := make(chan Request)
+	go Initialize(ch)
 
-	out := make(chan cacheRequest)
-	ch <- cacheRequest{
-		Type:    READ,
-		Key:     "key",
-		Out: out,
+	out := make(chan Request)
+	ch <- Request{
+		Type: READ,
+		Key:  "key",
+		Out:  out,
 	}
 
 	got := <-out
@@ -76,26 +76,26 @@ func TestCacheReadEmpty(t *testing.T) {
 }
 
 func TestCacheDelete(t *testing.T) {
-	ch := make(chan cacheRequest)
-	go initializeCache(ch)
+	ch := make(chan Request)
+	go Initialize(ch)
 	key := "key"
 
-	ch <- cacheRequest{
+	ch <- Request{
 		Type:    WRITE,
 		Payload: "value",
 		Key:     key,
 	}
 
-	ch <- cacheRequest{
-		Type:    DELETE,
-		Key:     key,
+	ch <- Request{
+		Type: DELETE,
+		Key:  key,
 	}
 
-	out := make(chan cacheRequest)
-	ch <- cacheRequest{
-		Type:    READ,
-		Key:     key,
-		Out: out,
+	out := make(chan Request)
+	ch <- Request{
+		Type: READ,
+		Key:  key,
+		Out:  out,
 	}
 
 	got := <-out

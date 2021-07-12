@@ -2,6 +2,7 @@ package commitlog
 
 import (
 	"bytes"
+	"commitlog/cache"
 	"commitlog/gocmd"
 	"fmt"
 	"github.com/dave/dst/decorator"
@@ -12,8 +13,8 @@ import (
 )
 
 type commitlogApp struct {
-	testCoverageCache chan cacheRequest
-	jobCache          chan cacheRequest
+	testCoverageCache chan cache.Request
+	jobCache          chan cache.Request
 }
 
 type jobConfig struct {
@@ -35,7 +36,7 @@ type jobCacheEntry struct {
 }
 
 func (c *commitlogApp) writeJobCacheEntry(id string, entry jobCacheEntry) {
-	writeCacheEntry(c.jobCache, id, entry)
+	cache.WriteEntry(c.jobCache, id, entry)
 }
 
 func (c *commitlogApp) finishJobWithError(id string, err error) {
@@ -53,9 +54,9 @@ func (c *commitlogApp) updateInProgressJobStatus(id, details string) {
 }
 
 func (c *commitlogApp) JobStatus(id string) (*jobCacheEntry, error) {
-	outCh := make(chan cacheRequest)
-	c.jobCache <- cacheRequest{
-		Type: READ,
+	outCh := make(chan cache.Request)
+	c.jobCache <- cache.Request{
+		Type: cache.READ,
 		Key:  id,
 		Out:  outCh,
 	}
@@ -91,11 +92,11 @@ func (c *commitlogApp) StartJob(conf jobConfig) string {
 }
 
 func NewCommitLogApp() *commitlogApp {
-	testCoverageChannel := make(chan cacheRequest)
-	go initializeCache(testCoverageChannel)
+	testCoverageChannel := make(chan cache.Request)
+	go cache.Initialize(testCoverageChannel)
 
-	jobChannel := make(chan cacheRequest)
-	go initializeCache(jobChannel)
+	jobChannel := make(chan cache.Request)
+	go cache.Initialize(jobChannel)
 
 	return &commitlogApp{
 		testCoverageCache: testCoverageChannel,
@@ -230,9 +231,9 @@ func (c *commitlogApp) computeFileContentsByTest(config computationConfig) ([]st
 }
 
 func (c *commitlogApp) getTestProfiles(pkg, test string) ([]*cover.Profile, error) {
-	outCh := make(chan cacheRequest)
-	c.testCoverageCache <- cacheRequest{
-		Type: READ,
+	outCh := make(chan cache.Request)
+	c.testCoverageCache <- cache.Request{
+		Type: cache.READ,
 		Key:  pkg + "-" + test,
 		Out:  outCh,
 	}
@@ -253,6 +254,6 @@ func (c *commitlogApp) getTestProfiles(pkg, test string) ([]*cover.Profile, erro
 		return nil, err
 	}
 
-	writeCacheEntry(c.testCoverageCache, pkg+"-"+test, profiles)
+	cache.WriteEntry(c.testCoverageCache, pkg+"-"+test, profiles)
 	return profiles, nil
 }

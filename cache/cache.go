@@ -1,31 +1,31 @@
-package commitlog
+package cache
 
 // Copied from: https://medium.com/@melvinodsa/building-a-high-performant-concurrent-cache-in-golang-b6442c20b2ca
 
-type requestType uint
+type RequestType uint
 
 const (
-	READ requestType = iota
+	READ RequestType = iota
 	WRITE
 	DELETE
 )
 
-func writeCacheEntry(ch chan cacheRequest, id string, entry interface{}) {
-	ch <- cacheRequest{
+func WriteEntry(ch chan Request, id string, entry interface{}) {
+	ch <- Request{
 		Type:    WRITE,
 		Payload: entry,
 		Key:     id,
 	}
 }
 
-type cacheRequest struct {
-	Type    requestType
+type Request struct {
+	Type    RequestType
 	Payload interface{}
 	Key     string
-	Out     chan cacheRequest
+	Out     chan Request
 }
 
-func initializeCache(ch chan cacheRequest) {
+func Initialize(ch chan Request) {
 	store := map[string]interface{}{}
 
 	for req := range ch {
