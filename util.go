@@ -32,7 +32,7 @@ func findFile(path string, pack string) (string, error) {
 	return filepath.Join(pkg.Dir, file), nil
 }
 
-func WriteFiles(fileContent map[string][]byte) error {
+func writeFiles(fileContent map[string][]byte) error {
 	for fn, content := range fileContent {
 		err := ioutil.WriteFile(fn, content, 0644)
 		if err != nil {

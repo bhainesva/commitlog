@@ -3,7 +3,6 @@ package commitlog
 import (
 	"bytes"
 	"commitlog/cache"
-	"commitlog/gocmd"
 	"fmt"
 	"github.com/dave/dst/decorator"
 	"github.com/google/uuid"
@@ -13,6 +12,7 @@ import (
 )
 
 type commitlogApp struct {
+	testRunner testRunner
 	testCoverageCache chan cache.Request
 	jobCache          chan cache.Request
 }
@@ -91,7 +91,11 @@ func (c *commitlogApp) StartJob(conf jobConfig) string {
 	return id.String()
 }
 
-func NewCommitLogApp() *commitlogApp {
+type testRunner interface {
+	GetCoverage(pkg, test string) ([]*cover.Profile, error)
+}
+
+func NewCommitLogApp(runner testRunner) *commitlogApp {
 	testCoverageChannel := make(chan cache.Request)
 	go cache.Initialize(testCoverageChannel)
 
@@ -99,6 +103,7 @@ func NewCommitLogApp() *commitlogApp {
 	go cache.Initialize(jobChannel)
 
 	return &commitlogApp{
+		testRunner: runner,
 		testCoverageCache: testCoverageChannel,
 		jobCache:          jobChannel,
 	}
@@ -140,7 +145,7 @@ type computationConfig struct {
 
 // computeFileContentsByTest takes a package name and test ordering
 // and returns a map filename -> fileContents for each test, where the content
-// is what is covered by the Tests up to that point in the ordering
+// is what is covered by the tests up to that point in the ordering
 func (c *commitlogApp) computeFileContentsByTest(config computationConfig) ([]string, []map[string][]byte, error) {
 	pkg := config.pkg
 	tests := config.tests
@@ -249,7 +254,7 @@ func (c *commitlogApp) getTestProfiles(pkg, test string) ([]*cover.Profile, erro
 		}
 	}
 
-	profiles, err := gocmd.TestCover(pkg, test, "coverage.out")
+	profiles, err := c.testRunner.GetCoverage(pkg, test)
 	if err != nil {
 		return nil, err
 	}

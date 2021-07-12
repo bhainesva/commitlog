@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-type goPackageInfoProvider interface {
+type languageProvider interface {
 	List() ([]string, error)
 	ListTests(pkg string) ([]string, error)
 }
@@ -18,9 +18,26 @@ type jobManager interface {
 	JobStatus(string) (*jobCacheEntry, error)
 }
 
+func cacheEntryToAPIResponse(e *jobCacheEntry) api.JobStatusResponse {
+	var filemaps []*api.FileMap
+	for _, fm := range e.Results.Files {
+		filemaps = append(filemaps, &api.FileMap{Files: fm})
+	}
+
+	return api.JobStatusResponse{
+		Complete: e.Complete,
+		Details:  e.Details,
+		Error:    e.Error,
+		Results: &api.JobResults{
+			Tests: e.Results.Tests,
+			Files: filemaps,
+		},
+	}
+}
+
 type Handler struct {
 	Jobs jobManager
-	GoInfo goPackageInfoProvider
+	LanguageInfo languageProvider
 }
 
 func respondWithJSON(w http.ResponseWriter, content interface{}) {
@@ -35,7 +52,7 @@ func respondWithJSON(w http.ResponseWriter, content interface{}) {
 }
 
 func (c *Handler) HandlePackages(w http.ResponseWriter, r *http.Request) {
-	output, err := c.GoInfo.List()
+	output, err := c.LanguageInfo.List()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -46,7 +63,7 @@ func (c *Handler) HandlePackages(w http.ResponseWriter, r *http.Request) {
 
 func (c *Handler) HandleTests(w http.ResponseWriter, r *http.Request) {
 	pkg := r.URL.Query().Get("pkg")
-	tests, err := c.GoInfo.ListTests(pkg)
+	tests, err := c.LanguageInfo.ListTests(pkg)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -63,7 +80,7 @@ func (c *Handler) HandleCheckoutFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	WriteFiles(req.GetFiles().GetFiles())
+	writeFiles(req.GetFiles().GetFiles())
 	return
 }
 
@@ -75,7 +92,7 @@ func (c *Handler) JobStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, status)
+	respondWithJSON(w, cacheEntryToAPIResponse(status))
 }
 
 func (c *Handler) HandleFiles(w http.ResponseWriter, r *http.Request) {

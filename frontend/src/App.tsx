@@ -10,6 +10,7 @@ import Toast, {ToastProps} from './Toast';
 import LandingPage from './LandingPage';
 import Page from './Page';
 import * as R from 'ramda'
+import { FileMap } from "./gen/api";
 
 declare var Prism: any;
 
@@ -146,18 +147,18 @@ export default function App() {
     const data = await fetch(`http://localhost:3000/job/${id}`)
       .then(r => r.json())
 
-    if (data.Complete) {
+    if (data.complete) {
       showSuccessToast("Processing Finished!")
-      setTests(data.Results.Tests);
+      setTests(data.results.tests);
       setActiveTest(0);
       setLoadingMessage('')
-      setFiles(data.Results.Files);
+      setFiles(data.results.files.map((x: FileMap) => x.files));
     } else {
       if (data.Error) {
-        showErrorToast("Job failed!: " + data.Error)
-        console.error("Job failed!: ", data.Error)
+        showErrorToast("Job failed!: " + data.error)
+        console.error("Job failed!: ", data.error)
       } else {
-        setLoadingMessage(data.Details + '...')
+        setLoadingMessage(data.details + '...')
         setTimeout(() => checkJobStatus(id), 300)
       }
     }

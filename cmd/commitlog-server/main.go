@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"golang.org/x/tools/cover"
 	"log"
 	"net/http"
 )
@@ -17,6 +18,9 @@ func (g goPkgInfo) List() ([]string, error) {
 func (g goPkgInfo) ListTests(pkg string) ([]string, error) {
 	return gocmd.TestList(pkg)
 }
+func (g goPkgInfo) GetCoverage(pkg string, test string) ([]*cover.Profile, error) {
+	return gocmd.TestCover(pkg, test, "coverage.out")
+}
 
 func main() {
 	r := chi.NewRouter()
@@ -27,10 +31,12 @@ func main() {
 		AllowedHeaders: []string{"Accept", "Content-Type"},
 	}))
 
-	commitLogApp := commitlog.NewCommitLogApp()
+	languageInfoProvider := goPkgInfo{}
+	commitLogApp := commitlog.NewCommitLogApp(languageInfoProvider)
+
 	commitLogHandler := commitlog.Handler{
 		Jobs: commitLogApp,
-		GoInfo: goPkgInfo{},
+		LanguageInfo: languageInfoProvider,
 	}
 
 	r.Get("/job/{id:[0-9a-zA-Z-]+}", commitLogHandler.JobStatus)
