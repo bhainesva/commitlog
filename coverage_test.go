@@ -138,7 +138,7 @@ func blocksEqual(b1, b2 []cover.ProfileBlock) bool {
 	return true
 }
 
-func TestConstructCoveredDST(t *testing.T) {
+func TestConstructCoveredDSTs(t *testing.T) {
 	code := `package main
 
 func uncovered(){

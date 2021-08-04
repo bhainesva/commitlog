@@ -2,30 +2,41 @@ package commitlog
 
 import (
 	"bytes"
-	"commitlog/cache"
 	"fmt"
 	"github.com/dave/dst/decorator"
 	"github.com/google/uuid"
 	"golang.org/x/tools/cover"
+	"io"
 	"io/ioutil"
-	"log"
 )
 
 type commitlogApp struct {
 	testRunner testRunner
-	testCoverageCache chan cache.Request
-	jobCache          chan cache.Request
+	testCoverageCache cache
+	jobCache          cache
 }
 
-type jobConfig struct {
+type testRunner interface {
+	// GetCoverage returns a go-style coverage profile given an identifier
+	// for a package and test to run
+	GetCoverage(pkg, test string) ([]*cover.Profile, error)
+}
+
+type JobConfig struct {
 	pkg   string
 	tests []string
-	sort  string
+	sort  testSortingFunction
 }
 
 type jobResult struct {
 	Tests []string
 	Files []map[string][]byte
+}
+
+type cache interface {
+	Read(key string) interface{}
+	Write(key string, value interface{})
+	Delete(key string)
 }
 
 type jobCacheEntry struct {
@@ -35,53 +46,30 @@ type jobCacheEntry struct {
 	Results  jobResult
 }
 
-func (c *commitlogApp) writeJobCacheEntry(id string, entry jobCacheEntry) {
-	cache.WriteEntry(c.jobCache, id, entry)
-}
-
-func (c *commitlogApp) finishJobWithError(id string, err error) {
-	c.writeJobCacheEntry(id, jobCacheEntry{
-		Complete: true,
-		Error:    err.Error(),
-	})
-}
-
-func (c *commitlogApp) updateInProgressJobStatus(id, details string) {
-	c.writeJobCacheEntry(id, jobCacheEntry{
-		Complete: false,
-		Details:  details,
-	})
-}
-
-func (c *commitlogApp) JobStatus(id string) (*jobCacheEntry, error) {
-	outCh := make(chan cache.Request)
-	c.jobCache <- cache.Request{
-		Type: cache.READ,
-		Key:  id,
-		Out:  outCh,
+func NewCommitLogApp(runner testRunner, testCoverageCache cache, jobCache cache) *commitlogApp {
+	return &commitlogApp{
+		testRunner: runner,
+		testCoverageCache: testCoverageCache,
+		jobCache:          jobCache,
 	}
-	info := <-outCh
-	if info.Payload != nil {
-		val, ok := info.Payload.(jobCacheEntry)
-		if !ok {
-			return nil, fmt.Errorf("unexpected payload type in job cache: %#v", val)
-		}
-		return &val, nil
-	}
-
-	return nil, nil
 }
 
-func (c *commitlogApp) StartJob(conf jobConfig) string {
+func (c *commitlogApp) StartJob(conf JobConfig) string {
 	id := uuid.New()
-	c.updateInProgressJobStatus(id.String(), "Initializing job")
+	c.jobCache.Write(id.String(), jobCacheEntry{
+		Complete: false,
+		Details:  "Initializing job",
+	})
 
 	go func() {
-		results, err := c.jobOperation(id.String(), conf)
+		results, err := c.doJobOperation(id.String(), conf)
 		if err != nil {
-			c.finishJobWithError(id.String(), err)
+			c.jobCache.Write(id.String(), jobCacheEntry{
+				Complete: true,
+				Error:    err.Error(),
+			})
 		} else {
-			c.writeJobCacheEntry(id.String(), jobCacheEntry{
+			c.jobCache.Write(id.String(), jobCacheEntry{
 				Complete: true,
 				Results:  results,
 			})
@@ -91,40 +79,42 @@ func (c *commitlogApp) StartJob(conf jobConfig) string {
 	return id.String()
 }
 
-type testRunner interface {
-	GetCoverage(pkg, test string) ([]*cover.Profile, error)
-}
-
-func NewCommitLogApp(runner testRunner) *commitlogApp {
-	testCoverageChannel := make(chan cache.Request)
-	go cache.Initialize(testCoverageChannel)
-
-	jobChannel := make(chan cache.Request)
-	go cache.Initialize(jobChannel)
-
-	return &commitlogApp{
-		testRunner: runner,
-		testCoverageCache: testCoverageChannel,
-		jobCache:          jobChannel,
-	}
-}
-
-func (c *commitlogApp) jobOperation(id string, conf jobConfig) (jobResult, error) {
-	var sortFunc testSortingFunction
-	sortFunc = sortHardcodedOrder(conf.tests)
-	if conf.sort == "raw" {
-		sortFunc = sortTestsByRawLinesCovered
-	} else if conf.sort == "net" {
-		sortFunc = sortTestsByNewLinesCovered
-	} else if conf.sort == "importance" {
-		sortFunc = sortTestsByImportance
+func (c *commitlogApp) JobStatus(id string) (*jobCacheEntry, error) {
+	info := c.jobCache.Read(id)
+	if info == nil {
+		return nil, nil
 	}
 
-	tests, fileContents, err := c.computeFileContentsByTest(computationConfig{
-		pkg:   conf.pkg,
-		tests: conf.tests,
-		sort:  sortFunc,
+	val, ok := info.(jobCacheEntry)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type in job cache: %#v", val)
+	}
+	return &val, nil
+}
+
+type cacheWriter struct {
+	id string
+	cache
+}
+func (cw cacheWriter) Write(p []byte) (int, error) {
+	cw.cache.Write(cw.id, jobCacheEntry{
+		Complete: false,
+		Details:  string(p),
+	})
+	return len(p), nil
+}
+
+func (c *commitlogApp) doJobOperation(id string, conf JobConfig) (jobResult, error) {
+	tests, fileContents, err := computeFileContentsByTest(computationConfig{
 		uuid:  id,
+		testCoverageCache: c.testCoverageCache,
+		statusWriter: cacheWriter{id: id, cache: c.jobCache},
+		runner: c.testRunner,
+		JobConfig: JobConfig{
+			pkg:   conf.pkg,
+			tests: conf.tests,
+			sort:  conf.sort,
+		},
 	})
 	if err != nil {
 		return jobResult{}, err
@@ -138,76 +128,69 @@ func (c *commitlogApp) jobOperation(id string, conf jobConfig) (jobResult, error
 
 type computationConfig struct {
 	uuid  string
-	pkg   string
-	tests []string
-	sort  testSortingFunction
+	testCoverageCache cache
+	statusWriter io.Writer
+	runner testRunner
+	JobConfig
 }
 
-// computeFileContentsByTest takes a package name and test ordering
-// and returns a map filename -> fileContents for each test, where the content
-// is what is covered by the tests up to that point in the ordering
-func (c *commitlogApp) computeFileContentsByTest(config computationConfig) ([]string, []map[string][]byte, error) {
-	pkg := config.pkg
-	tests := config.tests
-
-	out := make([]map[string][]byte, len(tests)+1)
-	profilesByTest := testProfileData{}
-	finalContentsMap := map[string][]byte{}
-
-	var prevProfiles []*cover.Profile
+// computeFileContentsByTest calculates code diffs given a computationConfig.
+// It returns the ordered tests, a map filename -> fileContents for each test, where the content
+// is what is covered by the tests up to that point in the ordering, and an error.
+func computeFileContentsByTest(config computationConfig) ([]string, []map[string][]byte, error) {
+	var (
+		pkg = config.pkg
+		tests = config.tests
+		prevProfiles []*cover.Profile
+		out = make([]map[string][]byte, len(tests)+1)
+		profilesByTest = testProfileData{}
+		finalContentsMap = map[string][]byte{}
+	)
 
 	for i, test := range tests {
-		c.writeJobCacheEntry(config.uuid, jobCacheEntry{
-			Complete: false,
-			Details:  fmt.Sprintf("Computing coverage for %d of %d Tests", i+1, len(tests)),
-		})
-		profiles, err := c.getTestProfiles(pkg, test)
+		config.statusWriter.Write([]byte(fmt.Sprintf("Computing coverage for %d of %d tests", i+1, len(tests))))
+		profiles, err := getTestProfiles(pkg, test, config.runner, config.testCoverageCache)
 		if err != nil {
 			return nil, nil, err
 		}
+		config.testCoverageCache.Write(cacheKeyForTest(pkg, test), profiles)
 
 		profilesByTest[test] = profiles
 	}
 
-	c.writeJobCacheEntry(config.uuid, jobCacheEntry{
-		Complete: false,
-		Details:  "Computing test ordering",
-	})
+	config.statusWriter.Write([]byte("Computing test ordering"))
 
 	sortedTests := config.sort(profilesByTest)
-	log.Println("got sorted tests: ", sortedTests)
+	config.statusWriter.Write([]byte(fmt.Sprint("got sorted tests: ", sortedTests)))
 
 	for i, test := range sortedTests {
-		c.writeJobCacheEntry(config.uuid, jobCacheEntry{
-			Complete: false,
-			Details:  fmt.Sprintf("Constructing diff %d of %d", i+1, len(sortedTests)),
-		})
+		config.statusWriter.Write([]byte(fmt.Sprintf("Constructing diff %d of %d", i+1, len(sortedTests))))
 		profiles := profilesByTest[test]
 		activeProfiles, _ := mergeProfiles(prevProfiles, profiles)
 
 		contentsMap := map[string][]byte{}
 
-		log.Println("constructing dsts")
+		config.statusWriter.Write( []byte("constructing dsts"))
 		files, fset, ds, err := constructCoveredDSTs(activeProfiles, pkg)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		log.Println("removing dead code")
+		config.statusWriter.Write([]byte("removing dead code"))
 		// Parse package and kill dead code
 		undeadFiles, updated, err := removeDeadCode(files, fset, ds)
 		if err != nil {
 			return nil, nil, err
 		}
-		for updated != false {
+		for updated {
 			undeadFiles, updated, err = removeDeadCode(files, fset, ds)
 			if err != nil {
 				return nil, nil, err
 			}
 		}
 
-		log.Println("turning dsts to []bytes")
-		// Convert ASTs into []byte, get
+		config.statusWriter.Write([]byte("turning asts into []bytes"))
+		// Convert ASTs into []byte
 		for name, tree := range undeadFiles {
 			var buf bytes.Buffer
 			r := decorator.NewRestorer()
@@ -219,7 +202,7 @@ func (c *commitlogApp) computeFileContentsByTest(config computationConfig) ([]st
 			contentsMap[name] = buf.Bytes()
 
 			if _, ok := finalContentsMap[name]; !ok {
-				log.Println("loading final contents for", name)
+				config.statusWriter.Write([]byte(fmt.Sprintf("loading final contents for %s", name)))
 				fullFileData, err := ioutil.ReadFile(name)
 				if err != nil {
 					return nil, nil, err
@@ -235,18 +218,12 @@ func (c *commitlogApp) computeFileContentsByTest(config computationConfig) ([]st
 	return sortedTests, out, nil
 }
 
-func (c *commitlogApp) getTestProfiles(pkg, test string) ([]*cover.Profile, error) {
-	outCh := make(chan cache.Request)
-	c.testCoverageCache <- cache.Request{
-		Type: cache.READ,
-		Key:  pkg + "-" + test,
-		Out:  outCh,
-	}
-	info := <-outCh
-	if info.Payload != nil {
-		val, ok := info.Payload.([]*cover.Profile)
+func getTestProfiles(pkg, test string, runner testRunner, testCache cache) ([]*cover.Profile, error) {
+	info := testCache.Read(cacheKeyForTest(pkg, test))
+	if info != nil {
+		val, ok := info.([]*cover.Profile)
 		if !ok {
-			return nil, fmt.Errorf("unexpected payload type in test cache: %#v", val)
+			return nil, fmt.Errorf("unexpected type in test cache: %#v", val)
 		}
 
 		if val != nil {
@@ -254,11 +231,14 @@ func (c *commitlogApp) getTestProfiles(pkg, test string) ([]*cover.Profile, erro
 		}
 	}
 
-	profiles, err := c.testRunner.GetCoverage(pkg, test)
+	profiles, err := runner.GetCoverage(pkg, test)
 	if err != nil {
 		return nil, err
 	}
 
-	cache.WriteEntry(c.testCoverageCache, pkg+"-"+test, profiles)
 	return profiles, nil
+}
+
+func cacheKeyForTest(pkg, test string) string {
+	return pkg + "-" + test
 }

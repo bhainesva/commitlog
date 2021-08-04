@@ -11,7 +11,7 @@ import (
 // findFile is copied from golang.org/x/tools/cmd/cover/func.go.
 // It returns the absolute path of a file given its package relative
 // location.
-// Ex:commitlog/simple/simple.go -> /Users/bhaines/repo/commitlog/simple/simple.go
+// Ex:commitlog/demo/demo.go -> /Users/bhaines/repo/commitlog/demo/demo.go
 func findFile(path string, pack string) (string, error) {
 	if filepath.IsAbs(path) {
 		return path, nil

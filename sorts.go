@@ -6,6 +6,8 @@ import (
 	"golang.org/x/tools/cover"
 )
 
+type testProfileData map[string][]*cover.Profile
+
 type testSortingFunction func(testProfileData) []string
 
 // sortHardcodedOrder returns a sorting function that always produces
@@ -55,7 +57,7 @@ func sortTestsByNewLinesCovered(testProfiles testProfileData) []string {
 		for i, test := range tests {
 			profiles := testProfiles[test]
 			newCoverage, coverageGain := mergeProfiles(existingCoverage, profiles)
-			if minCoverageGain == 0 || coverageGain < minCoverageGain {
+			if minCoverageGain == -1 || coverageGain < minCoverageGain {
 				minTestIdx = i
 				minCoverageGain = coverageGain
 				minCoverage = newCoverage

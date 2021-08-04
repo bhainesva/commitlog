@@ -7,7 +7,55 @@ export const protobufPackage = "";
 export interface FetchFilesRequest {
   tests: string[];
   pkg: string;
-  sort: string;
+  sort: FetchFilesRequest_SortType;
+}
+
+export enum FetchFilesRequest_SortType {
+  HARDCODED = 0,
+  RAW = 1,
+  NET = 2,
+  IMPORTANCE = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function fetchFilesRequest_SortTypeFromJSON(
+  object: any
+): FetchFilesRequest_SortType {
+  switch (object) {
+    case 0:
+    case "HARDCODED":
+      return FetchFilesRequest_SortType.HARDCODED;
+    case 1:
+    case "RAW":
+      return FetchFilesRequest_SortType.RAW;
+    case 2:
+    case "NET":
+      return FetchFilesRequest_SortType.NET;
+    case 3:
+    case "IMPORTANCE":
+      return FetchFilesRequest_SortType.IMPORTANCE;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return FetchFilesRequest_SortType.UNRECOGNIZED;
+  }
+}
+
+export function fetchFilesRequest_SortTypeToJSON(
+  object: FetchFilesRequest_SortType
+): string {
+  switch (object) {
+    case FetchFilesRequest_SortType.HARDCODED:
+      return "HARDCODED";
+    case FetchFilesRequest_SortType.RAW:
+      return "RAW";
+    case FetchFilesRequest_SortType.NET:
+      return "NET";
+    case FetchFilesRequest_SortType.IMPORTANCE:
+      return "IMPORTANCE";
+    default:
+      return "UNKNOWN";
+  }
 }
 
 export interface FetchFilesResponse {
@@ -39,7 +87,7 @@ export interface FileMap_FilesEntry {
   value: Uint8Array;
 }
 
-const baseFetchFilesRequest: object = { tests: "", pkg: "", sort: "" };
+const baseFetchFilesRequest: object = { tests: "", pkg: "", sort: 0 };
 
 export const FetchFilesRequest = {
   encode(
@@ -52,8 +100,8 @@ export const FetchFilesRequest = {
     if (message.pkg !== "") {
       writer.uint32(18).string(message.pkg);
     }
-    if (message.sort !== "") {
-      writer.uint32(26).string(message.sort);
+    if (message.sort !== 0) {
+      writer.uint32(24).int32(message.sort);
     }
     return writer;
   },
@@ -73,7 +121,7 @@ export const FetchFilesRequest = {
           message.pkg = reader.string();
           break;
         case 3:
-          message.sort = reader.string();
+          message.sort = reader.int32() as any;
           break;
         default:
           reader.skipType(tag & 7);
@@ -97,9 +145,9 @@ export const FetchFilesRequest = {
       message.pkg = "";
     }
     if (object.sort !== undefined && object.sort !== null) {
-      message.sort = String(object.sort);
+      message.sort = fetchFilesRequest_SortTypeFromJSON(object.sort);
     } else {
-      message.sort = "";
+      message.sort = 0;
     }
     return message;
   },
@@ -112,7 +160,8 @@ export const FetchFilesRequest = {
       obj.tests = [];
     }
     message.pkg !== undefined && (obj.pkg = message.pkg);
-    message.sort !== undefined && (obj.sort = message.sort);
+    message.sort !== undefined &&
+      (obj.sort = fetchFilesRequest_SortTypeToJSON(message.sort));
     return obj;
   },
 
@@ -132,7 +181,7 @@ export const FetchFilesRequest = {
     if (object.sort !== undefined && object.sort !== null) {
       message.sort = object.sort;
     } else {
-      message.sort = "";
+      message.sort = 0;
     }
     return message;
   },

@@ -9,8 +9,6 @@ import (
 	"golang.org/x/tools/cover"
 )
 
-type testProfileData map[string][]*cover.Profile
-
 // coveredLines returns a set of line numbers of the
 // covered lines from a list of profiles
 func coveredLines(pp ...*cover.Profile) map[int]struct{} {
@@ -67,7 +65,7 @@ func inUncoveredBlock(profile *cover.Profile, pos token.Position) bool {
 	return false
 }
 
-// mergeProfiles combines a set of new coverage profiles into a set of existing
+// mergeProfiles merges a set of new coverage profiles into a set of existing
 // coverage profiles. A profile block that is covered in any of the input profiles
 // will be covered in the output profiles. The function returns the new profiles, and
 // a number representing the net lines covered added by the new profiles.

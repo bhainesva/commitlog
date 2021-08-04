@@ -1,32 +1,62 @@
 package cache
 
-// Copied from: https://medium.com/@melvinodsa/building-a-high-performant-concurrent-cache-in-golang-b6442c20b2ca
+// Based on: https://medium.com/@melvinodsa/building-a-high-performant-concurrent-cache-in-golang-b6442c20b2ca
 
-type RequestType uint
+type Cache chan request
+
+type requestType uint
 
 const (
-	READ RequestType = iota
+	READ requestType = iota
 	WRITE
 	DELETE
 )
 
-func WriteEntry(ch chan Request, id string, entry interface{}) {
-	ch <- Request{
+func New() Cache {
+	return From(map[string]interface{}{})
+}
+
+func From(cache map[string]interface{}) Cache {
+	ch := make(chan request)
+	go initialize(ch, cache)
+	return ch
+}
+
+func (c Cache) Write(key string, entry interface{}) {
+	c <- request{
 		Type:    WRITE,
 		Payload: entry,
-		Key:     id,
+		Key:     key,
 	}
 }
 
-type Request struct {
-	Type    RequestType
-	Payload interface{}
-	Key     string
-	Out     chan Request
+func (c Cache) Delete(key string) {
+	c <- request{
+		Type: DELETE,
+		Key:  key,
+	}
 }
 
-func Initialize(ch chan Request) {
-	store := map[string]interface{}{}
+func (c Cache) Read(key string) interface{} {
+	out := make(chan request)
+	c <- request{
+		Type:    READ,
+		Key:     key,
+		Out: out,
+	}
+	got := <-out
+	return got.Payload
+}
+
+type request struct {
+	Type    requestType
+	Payload interface{}
+	Key     string
+	Out     chan request
+}
+
+func initialize(ch chan request, initial map[string]interface{}) {
+	store := initial
 
 	for req := range ch {
 		switch req.Type {

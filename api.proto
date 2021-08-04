@@ -5,7 +5,14 @@ option go_package = "api/";
 message FetchFilesRequest {
   repeated string tests = 1;
   string pkg = 2;
-  string sort = 3;
+  enum SortType {
+    HARDCODED = 0;
+    RAW = 1;
+    NET   = 2;
+    IMPORTANCE  = 3;
+  }
+
+  SortType sort = 3;
 }
 
 message FetchFilesResponse {

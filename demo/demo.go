@@ -1,5 +1,5 @@
-// package simple provides example code/tests to run the tool against
-package simple
+// package demo provides example code/tests to run the tool against
+package demo
 
 import (
 	"fmt"

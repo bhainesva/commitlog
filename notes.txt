@@ -19,6 +19,9 @@ if x := funcWithSideEffect(); x {
 we delete the whole block. I think it's fine, in most case having the condition floating
 by itself would just be confusing
 
+tests frequently 'cover' a lot of code that isn't particularly relevant to the specific test
+everything runs even if you don't care about it. you can split stuff out into a function, but
+unless it's guarded by an if statement it doesn't help much
 
 thought just deleting uncovered lines would be enough but it wasn't because of how the weird { } cases
 work.

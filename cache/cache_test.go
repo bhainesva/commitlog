@@ -5,28 +5,15 @@ import (
 )
 
 func TestCacheWriteThenRead(t *testing.T) {
-	ch := make(chan Request)
-	go Initialize(ch)
+	ch := New()
 	expectedValue := "test"
 	key := "key"
 
-	ch <- Request{
-		Type:    WRITE,
-		Payload: expectedValue,
-		Key:     key,
-	}
-
-	out := make(chan Request)
-	ch <- Request{
-		Type: READ,
-		Key:  key,
-		Out:  out,
-	}
-
-	got := <-out
-	gotStr, ok := got.Payload.(string)
+	ch.Write(key, expectedValue)
+	got := ch.Read(key)
+	gotStr, ok := got.(string)
 	if !ok {
-		t.Errorf("Expected to find string value on cache read, got: %#v", got.Payload)
+		t.Errorf("Expected to find string value on cache read, got: %#v", got)
 	}
 	if gotStr != expectedValue {
 		t.Errorf("Read %s from cache; expected %s", gotStr, expectedValue)
@@ -34,24 +21,16 @@ func TestCacheWriteThenRead(t *testing.T) {
 }
 
 func TestCacheWriteHelper(t *testing.T) {
-	ch := make(chan Request)
-	go Initialize(ch)
+	ch := New()
 	key := "key"
 	expectedValue := "test"
 
-	WriteEntry(ch, key, expectedValue)
+	ch.Write(key, expectedValue)
 
-	out := make(chan Request)
-	ch <- Request{
-		Type: READ,
-		Key:  key,
-		Out:  out,
-	}
-
-	got := <-out
-	gotStr, ok := got.Payload.(string)
+	got := ch.Read(key)
+	gotStr, ok := got.(string)
 	if !ok {
-		t.Errorf("Expected to find string value on cache read, got: %#v", got.Payload)
+		t.Errorf("Expected to find string value on cache read, got: %#v", got)
 	}
 	if gotStr != expectedValue {
 		t.Errorf("Read %s from cache; expected %s", gotStr, expectedValue)
@@ -59,47 +38,23 @@ func TestCacheWriteHelper(t *testing.T) {
 }
 
 func TestCacheReadEmpty(t *testing.T) {
-	ch := make(chan Request)
-	go Initialize(ch)
+	ch := New()
 
-	out := make(chan Request)
-	ch <- Request{
-		Type: READ,
-		Key:  "key",
-		Out:  out,
-	}
-
-	got := <-out
-	if got.Payload != nil {
+	got := ch.Read("key")
+	if got != nil {
 		t.Errorf("Expected nil payload when reading non-existent key")
 	}
 }
 
 func TestCacheDelete(t *testing.T) {
-	ch := make(chan Request)
-	go Initialize(ch)
+	ch := New()
 	key := "key"
 
-	ch <- Request{
-		Type:    WRITE,
-		Payload: "value",
-		Key:     key,
-	}
+	ch.Write(key, "value")
+	ch.Delete(key)
+	got := ch.Read(key)
 
-	ch <- Request{
-		Type: DELETE,
-		Key:  key,
-	}
-
-	out := make(chan Request)
-	ch <- Request{
-		Type: READ,
-		Key:  key,
-		Out:  out,
-	}
-
-	got := <-out
-	if got.Payload != nil {
+	if got != nil {
 		t.Errorf("Expected nil payload when reading deleted key")
 	}
 }

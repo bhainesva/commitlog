@@ -57,24 +57,23 @@ func TestCover(pkg, test, coverFilename string) ([]*cover.Profile, error) {
 	return profiles, nil
 }
 
-var (
-	slashSlash = []byte("//")
-	moduleStr  = []byte("module")
-)
-
 // modulePath returns the module path from the gomod file text.
 // If it cannot find a module path, it returns an empty string.
 // It is tolerant of unrelated problems in the go.mod file.
 //
 // Copied from cmd/go/internal/modfile.
 func modulePath(mod []byte) string {
+	var (
+		moduleStr  = []byte("module")
+	)
+
 	for len(mod) > 0 {
 		line := mod
 		mod = nil
 		if i := bytes.IndexByte(line, '\n'); i >= 0 {
 			line, mod = line[:i], line[i+1:]
 		}
-		if i := bytes.Index(line, slashSlash); i >= 0 {
+		if i := bytes.Index(line, []byte("//")); i >= 0 {
 			line = line[:i]
 		}
 		line = bytes.TrimSpace(line)

@@ -17,6 +17,7 @@ var global = Function('return this')();
 
 goog.exportSymbol('proto.CheckoutFilesRequest', null, global);
 goog.exportSymbol('proto.FetchFilesRequest', null, global);
+goog.exportSymbol('proto.FetchFilesRequest.SortType', null, global);
 goog.exportSymbol('proto.FetchFilesResponse', null, global);
 goog.exportSymbol('proto.FileMap', null, global);
 goog.exportSymbol('proto.JobResults', null, global);
@@ -188,7 +189,7 @@ proto.FetchFilesRequest.toObject = function(includeInstance, msg) {
   var f, obj = {
     testsList: (f = jspb.Message.getRepeatedField(msg, 1)) == null ? undefined : f,
     pkg: jspb.Message.getFieldWithDefault(msg, 2, ""),
-    sort: jspb.Message.getFieldWithDefault(msg, 3, "")
+    sort: jspb.Message.getFieldWithDefault(msg, 3, 0)
   };
 
   if (includeInstance) {
@@ -234,7 +235,7 @@ proto.FetchFilesRequest.deserializeBinaryFromReader = function(msg, reader) {
       msg.setPkg(value);
       break;
     case 3:
-      var value = /** @type {string} */ (reader.readString());
+      var value = /** @type {!proto.FetchFilesRequest.SortType} */ (reader.readEnum());
       msg.setSort(value);
       break;
     default:
@@ -281,14 +282,24 @@ proto.FetchFilesRequest.serializeBinaryToWriter = function(message, writer) {
     );
   }
   f = message.getSort();
-  if (f.length > 0) {
-    writer.writeString(
+  if (f !== 0.0) {
+    writer.writeEnum(
       3,
       f
     );
   }
 };
 
+
+/**
+ * @enum {number}
+ */
+proto.FetchFilesRequest.SortType = {
+  HARDCODED: 0,
+  RAW: 1,
+  NET: 2,
+  IMPORTANCE: 3
+};
 
 /**
  * repeated string tests = 1;
@@ -346,20 +357,20 @@ proto.FetchFilesRequest.prototype.setPkg = function(value) {
 
 
 /**
- * optional string sort = 3;
- * @return {string}
+ * optional SortType sort = 3;
+ * @return {!proto.FetchFilesRequest.SortType}
  */
 proto.FetchFilesRequest.prototype.getSort = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 3, ""));
+  return /** @type {!proto.FetchFilesRequest.SortType} */ (jspb.Message.getFieldWithDefault(this, 3, 0));
 };
 
 
 /**
- * @param {string} value
+ * @param {!proto.FetchFilesRequest.SortType} value
  * @return {!proto.FetchFilesRequest} returns this
  */
 proto.FetchFilesRequest.prototype.setSort = function(value) {
-  return jspb.Message.setProto3StringField(this, 3, value);
+  return jspb.Message.setProto3EnumField(this, 3, value);
 };
 
 

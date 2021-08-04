@@ -63,7 +63,7 @@ export default function App() {
 
 
   const fetchFiles = async (pkg: string, testNames: string[], sortType: string) => {
-    return fetch('http://localhost:3000/listFiles', {
+    return fetch('http://localhost:3000/job', {
       method: 'POST',
       body: JSON.stringify({
         pkg,
