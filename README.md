@@ -28,6 +28,7 @@ To run everything you'll need node version 14+ and go version 1.16+.
 
 1. Clone the repo.
 2. Install javascript dependencies by running `npm install` or `yarn install`
-3. Start the backend by running `go run .` inside `cmd/commitlog-server/`
-4. Start the frontend by running `npm run start` or `yarn start` in `frontend/`
-5. Visit `http://localhost:8080`
+3. Generate protos by running `build.sh`
+4. Start the backend by running `go run .` inside `cmd/commitlog-server/`
+5. Start the frontend by running `npm run start` or `yarn start` in `frontend/`
+6. Visit `http://localhost:8080`
