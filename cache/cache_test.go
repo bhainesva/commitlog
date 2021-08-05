@@ -4,12 +4,11 @@ import (
 	"testing"
 )
 
-func TestCacheWriteThenRead(t *testing.T) {
-	ch := New()
+func TestRead(t *testing.T) {
 	expectedValue := "test"
 	key := "key"
+	ch := From(map[string]interface{}{key: expectedValue})
 
-	ch.Write(key, expectedValue)
 	got := ch.Read(key)
 	gotStr, ok := got.(string)
 	if !ok {
@@ -20,7 +19,7 @@ func TestCacheWriteThenRead(t *testing.T) {
 	}
 }
 
-func TestCacheWriteHelper(t *testing.T) {
+func TestWrite(t *testing.T) {
 	ch := New()
 	key := "key"
 	expectedValue := "test"
@@ -47,10 +46,9 @@ func TestCacheReadEmpty(t *testing.T) {
 }
 
 func TestCacheDelete(t *testing.T) {
-	ch := New()
 	key := "key"
+	ch := From(map[string]interface{}{key: "value"})
 
-	ch.Write(key, "value")
 	ch.Delete(key)
 	got := ch.Read(key)
 

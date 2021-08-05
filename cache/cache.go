@@ -56,7 +56,12 @@ type request struct {
 }
 
 func initialize(ch chan request, initial map[string]interface{}) {
-	store := initial
+	store := map[string]interface{}{}
+	// Copy map so caller can't maintain reference
+	// to the internal store and break thread safety
+	for k, v := range initial {
+		store[k] = v
+	}
 
 	for req := range ch {
 		switch req.Type {
