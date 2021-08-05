@@ -85,7 +85,7 @@ func (c *Handler) JobStatus(w http.ResponseWriter, r *http.Request) {
 
 // StartJob begins processing a job according to the posted job config
 func (c *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
-	var req api.FetchFilesRequest
+	var req api.StartJobRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -94,13 +94,13 @@ func (c *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 
 	var sortFunc testSortingFunction
 	switch req.GetSort() {
-	case api.FetchFilesRequest_RAW:
+	case api.StartJobRequest_RAW:
 		sortFunc = sortTestsByRawLinesCovered
-	case api.FetchFilesRequest_NET:
+	case api.StartJobRequest_NET:
 		sortFunc = sortTestsByNewLinesCovered
-	case api.FetchFilesRequest_IMPORTANCE:
+	case api.StartJobRequest_IMPORTANCE:
 		sortFunc = sortTestsByImportance
-	case api.FetchFilesRequest_HARDCODED:
+	case api.StartJobRequest_HARDCODED:
 		sortFunc = sortHardcodedOrder(req.GetTests())
 	}
 
@@ -110,7 +110,7 @@ func (c *Handler) StartJob(w http.ResponseWriter, r *http.Request) {
 		sort:  sortFunc,
 	})
 
-	respondWithJSON(w, api.FetchFilesResponse{Id: id})
+	respondWithJSON(w, api.StartJobResponse{Id: id})
 }
 
 func respondWithJSON(w http.ResponseWriter, content interface{}) {

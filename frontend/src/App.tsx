@@ -10,7 +10,7 @@ import Toast, {ToastProps} from './Toast';
 import LandingPage from './LandingPage';
 import Page from './Page';
 import * as R from 'ramda'
-import { FileMap, FetchFilesRequest_SortType } from "./gen/api";
+import { FileMap, StartJobRequest_SortType } from "./gen/api";
 
 declare var Prism: any;
 
@@ -62,7 +62,7 @@ export default function App() {
   }
 
 
-  const fetchFiles = async (pkg: string, testNames: string[], sortType: FetchFilesRequest_SortType) => {
+  const fetchFiles = async (pkg: string, testNames: string[], sortType: StartJobRequest_SortType) => {
     return fetch('http://localhost:3000/job', {
       method: 'POST',
       body: JSON.stringify({
@@ -164,7 +164,7 @@ export default function App() {
     }
   }
 
-  async function handleGenerateLogs(sortType: FetchFilesRequest_SortType) {
+  async function handleGenerateLogs(sortType: StartJobRequest_SortType) {
     fetchFiles(activePkg, tests, sortType).then(data => {
       setLoadingMessage('Analyzing package...')
       checkJobStatus(data.id)
@@ -194,9 +194,9 @@ export default function App() {
           <div className="TestOrdering-auto">
             <h2>Choose an automatic test ordering</h2>
             <div>
-              <button onClick={() => handleGenerateLogs(FetchFilesRequest_SortType.RAW)}>Generate with tests sorted by raw lines covered</button>
-              <button onClick={() => handleGenerateLogs(FetchFilesRequest_SortType.IMPORTANCE)}>Generate with tests sorted by net lines covered</button>
-              <button onClick={() => handleGenerateLogs(FetchFilesRequest_SortType.NET)}>Generate with tests sorted by 'importance' heuristic*</button>
+              <button onClick={() => handleGenerateLogs(StartJobRequest_SortType.RAW)}>Generate with tests sorted by raw lines covered</button>
+              <button onClick={() => handleGenerateLogs(StartJobRequest_SortType.IMPORTANCE)}>Generate with tests sorted by net lines covered</button>
+              <button onClick={() => handleGenerateLogs(StartJobRequest_SortType.NET)}>Generate with tests sorted by 'importance' heuristic*</button>
             </div>
 
             <div>*The heuristic works by computing a score for each line of the code, based on the number of tests that cover it. Tests are then ordered by the average score of the lines they cover</div>
@@ -204,7 +204,7 @@ export default function App() {
 
           <div className="TestOrdering-manual">
             <h2>Or manually order your tests (click and drag to reorder)</h2>
-            <button onClick={() => handleGenerateLogs(FetchFilesRequest_SortType.HARDCODED)}>Generate with this order</button>
+            <button onClick={() => handleGenerateLogs(StartJobRequest_SortType.HARDCODED)}>Generate with this order</button>
             <DndProvider backend={HTML5Backend}>
               <DraggableList setItems={setTests} items={tests} />
             </DndProvider>

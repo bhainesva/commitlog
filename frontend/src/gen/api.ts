@@ -4,13 +4,13 @@ import _m0 from "protobufjs/minimal";
 
 export const protobufPackage = "";
 
-export interface FetchFilesRequest {
+export interface StartJobRequest {
   tests: string[];
   pkg: string;
-  sort: FetchFilesRequest_SortType;
+  sort: StartJobRequest_SortType;
 }
 
-export enum FetchFilesRequest_SortType {
+export enum StartJobRequest_SortType {
   HARDCODED = 0,
   RAW = 1,
   NET = 2,
@@ -18,47 +18,47 @@ export enum FetchFilesRequest_SortType {
   UNRECOGNIZED = -1,
 }
 
-export function fetchFilesRequest_SortTypeFromJSON(
+export function startJobRequest_SortTypeFromJSON(
   object: any
-): FetchFilesRequest_SortType {
+): StartJobRequest_SortType {
   switch (object) {
     case 0:
     case "HARDCODED":
-      return FetchFilesRequest_SortType.HARDCODED;
+      return StartJobRequest_SortType.HARDCODED;
     case 1:
     case "RAW":
-      return FetchFilesRequest_SortType.RAW;
+      return StartJobRequest_SortType.RAW;
     case 2:
     case "NET":
-      return FetchFilesRequest_SortType.NET;
+      return StartJobRequest_SortType.NET;
     case 3:
     case "IMPORTANCE":
-      return FetchFilesRequest_SortType.IMPORTANCE;
+      return StartJobRequest_SortType.IMPORTANCE;
     case -1:
     case "UNRECOGNIZED":
     default:
-      return FetchFilesRequest_SortType.UNRECOGNIZED;
+      return StartJobRequest_SortType.UNRECOGNIZED;
   }
 }
 
-export function fetchFilesRequest_SortTypeToJSON(
-  object: FetchFilesRequest_SortType
+export function startJobRequest_SortTypeToJSON(
+  object: StartJobRequest_SortType
 ): string {
   switch (object) {
-    case FetchFilesRequest_SortType.HARDCODED:
+    case StartJobRequest_SortType.HARDCODED:
       return "HARDCODED";
-    case FetchFilesRequest_SortType.RAW:
+    case StartJobRequest_SortType.RAW:
       return "RAW";
-    case FetchFilesRequest_SortType.NET:
+    case StartJobRequest_SortType.NET:
       return "NET";
-    case FetchFilesRequest_SortType.IMPORTANCE:
+    case StartJobRequest_SortType.IMPORTANCE:
       return "IMPORTANCE";
     default:
       return "UNKNOWN";
   }
 }
 
-export interface FetchFilesResponse {
+export interface StartJobResponse {
   id: string;
 }
 
@@ -87,11 +87,11 @@ export interface FileMap_FilesEntry {
   value: Uint8Array;
 }
 
-const baseFetchFilesRequest: object = { tests: "", pkg: "", sort: 0 };
+const baseStartJobRequest: object = { tests: "", pkg: "", sort: 0 };
 
-export const FetchFilesRequest = {
+export const StartJobRequest = {
   encode(
-    message: FetchFilesRequest,
+    message: StartJobRequest,
     writer: _m0.Writer = _m0.Writer.create()
   ): _m0.Writer {
     for (const v of message.tests) {
@@ -106,10 +106,10 @@ export const FetchFilesRequest = {
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): FetchFilesRequest {
+  decode(input: _m0.Reader | Uint8Array, length?: number): StartJobRequest {
     const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = { ...baseFetchFilesRequest } as FetchFilesRequest;
+    const message = { ...baseStartJobRequest } as StartJobRequest;
     message.tests = [];
     while (reader.pos < end) {
       const tag = reader.uint32();
@@ -131,8 +131,8 @@ export const FetchFilesRequest = {
     return message;
   },
 
-  fromJSON(object: any): FetchFilesRequest {
-    const message = { ...baseFetchFilesRequest } as FetchFilesRequest;
+  fromJSON(object: any): StartJobRequest {
+    const message = { ...baseStartJobRequest } as StartJobRequest;
     message.tests = [];
     if (object.tests !== undefined && object.tests !== null) {
       for (const e of object.tests) {
@@ -145,14 +145,14 @@ export const FetchFilesRequest = {
       message.pkg = "";
     }
     if (object.sort !== undefined && object.sort !== null) {
-      message.sort = fetchFilesRequest_SortTypeFromJSON(object.sort);
+      message.sort = startJobRequest_SortTypeFromJSON(object.sort);
     } else {
       message.sort = 0;
     }
     return message;
   },
 
-  toJSON(message: FetchFilesRequest): unknown {
+  toJSON(message: StartJobRequest): unknown {
     const obj: any = {};
     if (message.tests) {
       obj.tests = message.tests.map((e) => e);
@@ -161,12 +161,12 @@ export const FetchFilesRequest = {
     }
     message.pkg !== undefined && (obj.pkg = message.pkg);
     message.sort !== undefined &&
-      (obj.sort = fetchFilesRequest_SortTypeToJSON(message.sort));
+      (obj.sort = startJobRequest_SortTypeToJSON(message.sort));
     return obj;
   },
 
-  fromPartial(object: DeepPartial<FetchFilesRequest>): FetchFilesRequest {
-    const message = { ...baseFetchFilesRequest } as FetchFilesRequest;
+  fromPartial(object: DeepPartial<StartJobRequest>): StartJobRequest {
+    const message = { ...baseStartJobRequest } as StartJobRequest;
     message.tests = [];
     if (object.tests !== undefined && object.tests !== null) {
       for (const e of object.tests) {
@@ -187,11 +187,11 @@ export const FetchFilesRequest = {
   },
 };
 
-const baseFetchFilesResponse: object = { id: "" };
+const baseStartJobResponse: object = { id: "" };
 
-export const FetchFilesResponse = {
+export const StartJobResponse = {
   encode(
-    message: FetchFilesResponse,
+    message: StartJobResponse,
     writer: _m0.Writer = _m0.Writer.create()
   ): _m0.Writer {
     if (message.id !== "") {
@@ -200,10 +200,10 @@ export const FetchFilesResponse = {
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): FetchFilesResponse {
+  decode(input: _m0.Reader | Uint8Array, length?: number): StartJobResponse {
     const reader = input instanceof _m0.Reader ? input : new _m0.Reader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = { ...baseFetchFilesResponse } as FetchFilesResponse;
+    const message = { ...baseStartJobResponse } as StartJobResponse;
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -218,8 +218,8 @@ export const FetchFilesResponse = {
     return message;
   },
 
-  fromJSON(object: any): FetchFilesResponse {
-    const message = { ...baseFetchFilesResponse } as FetchFilesResponse;
+  fromJSON(object: any): StartJobResponse {
+    const message = { ...baseStartJobResponse } as StartJobResponse;
     if (object.id !== undefined && object.id !== null) {
       message.id = String(object.id);
     } else {
@@ -228,14 +228,14 @@ export const FetchFilesResponse = {
     return message;
   },
 
-  toJSON(message: FetchFilesResponse): unknown {
+  toJSON(message: StartJobResponse): unknown {
     const obj: any = {};
     message.id !== undefined && (obj.id = message.id);
     return obj;
   },
 
-  fromPartial(object: DeepPartial<FetchFilesResponse>): FetchFilesResponse {
-    const message = { ...baseFetchFilesResponse } as FetchFilesResponse;
+  fromPartial(object: DeepPartial<StartJobResponse>): StartJobResponse {
+    const message = { ...baseStartJobResponse } as StartJobResponse;
     if (object.id !== undefined && object.id !== null) {
       message.id = object.id;
     } else {

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 option go_package = "api/";
 
-message FetchFilesRequest {
+message StartJobRequest {
   repeated string tests = 1;
   string pkg = 2;
   enum SortType {
@@ -15,7 +15,7 @@ message FetchFilesRequest {
   SortType sort = 3;
 }
 
-message FetchFilesResponse {
+message StartJobResponse {
   string id = 1;
 }
 
