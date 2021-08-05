@@ -2,6 +2,7 @@ package main
 
 import (
 	"commitlog/cache"
+	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -24,7 +25,11 @@ func (g goPKGInfoProvider) ListTests(pkg string) ([]string, error) {
 
 type goTestRunner struct{}
 func (g goTestRunner) GetCoverage(pkg string, test string) ([]*cover.Profile, error) {
-	return gocmd.TestCover(pkg, test, "coverage.out")
+	f, err := ioutil.TempFile("", "")
+	if err != nil {
+		return nil, err
+	}
+	return gocmd.TestCover(pkg, test, f.Name())
 }
 
 func main() {
