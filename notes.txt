@@ -7,7 +7,6 @@ tmp files for coverage files / cleanup or something
 more algorithms to generate good test orders
 simplify testing flow
 run tests in parallel
-make theoretically language independent
 
 frontend:
 
