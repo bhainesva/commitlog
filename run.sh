@@ -1,4 +1,4 @@
-cd src
+cd cmd/commitlog-server
 go run main.go
 
 cd frontend
