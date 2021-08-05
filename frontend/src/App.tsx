@@ -31,6 +31,7 @@ export default function App() {
   const fetchTestNames = async (pkg: string) => {
     return fetch('http://localhost:3000/listTests?pkg=' + pkg)
       .then(r => r.json())
+      .catch(err => null)
   }
 
   useEffect(() => {
