@@ -128,7 +128,7 @@ func TestTestsHandler(t *testing.T) {
 }
 
 func TestStartJobHandler(t *testing.T) {
-	jobRequest := api.FetchFilesRequest{}
+	jobRequest := api.StartJobRequest{}
 	bs, err := json.Marshal(jobRequest)
 	if err != nil {
 		t.Fatal(err)
@@ -148,7 +148,7 @@ func TestStartJobHandler(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.StartJob(rr, req)
 
-	var response api.FetchFilesResponse
+	var response api.StartJobResponse
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
 	if err != nil {
 		t.Errorf("expected api.FetchFilesRequest response, couldn't unmarshall: %s", rr.Body.String())
