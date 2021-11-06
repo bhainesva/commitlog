@@ -45,9 +45,6 @@ func TestCover(pkg, test, coverFilename string) ([]*cover.Profile, error) {
 		return nil, err
 	}
 
-	if strings.HasPrefix(pkg, "/") {
-		coverFilename = filepath.Join(pkg, coverFilename)
-	}
 	profiles, err := cover.ParseProfiles(coverFilename)
 	if err != nil {
 		return nil, err
@@ -130,6 +127,7 @@ func TestList(pkg string) ([]string, error) {
 	if strings.HasPrefix(pkg, "/") {
 		targetName = "."
 	}
+
 	cmd := exec.Command("go", "test", targetName, "-list", ".*")
 
 	existingEnv := os.Environ()
