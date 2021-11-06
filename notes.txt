@@ -3,10 +3,9 @@ general:
 error page when job fails
 
 backend:
-tmp files for coverage files / cleanup or something
 more algorithms to generate good test orders
 simplify testing flow
-run tests in parallel
+get rid of files that are just package/import declarations after pruning
 
 frontend:
 

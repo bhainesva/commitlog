@@ -3,11 +3,14 @@ package commitlog
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"sync"
+	"sync/atomic"
+
 	"github.com/dave/dst/decorator"
 	"github.com/google/uuid"
 	"golang.org/x/tools/cover"
-	"io"
-	"io/ioutil"
 )
 
 type commitlogApp struct {
@@ -65,7 +68,6 @@ func (c *commitlogApp) StartJob(conf JobConfig) string {
 		results, err := c.doJobOperation(id.String(), conf)
 		if err != nil {
 			c.jobCache.Write(id.String(), jobCacheEntry{
-				Complete: true,
 				Error:    err.Error(),
 			})
 		} else {
@@ -134,6 +136,17 @@ type computationConfig struct {
 	JobConfig
 }
 
+type testCoverageRequest struct {
+	pkg string
+	test string
+}
+
+type testCoverageResponse struct {
+	test string
+	profiles []*cover.Profile
+}
+
+
 // computeFileContentsByTest calculates code diffs given a computationConfig.
 // It returns the ordered tests, a map filename -> fileContents for each test, where the content
 // is what is covered by the tests up to that point in the ordering, and an error.
@@ -145,17 +158,40 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 		out = make([]map[string][]byte, len(tests)+1)
 		profilesByTest = testProfileData{}
 		finalContentsMap = map[string][]byte{}
+		wg sync.WaitGroup
+		completedCoverageOps uint64
+		inputs = make(chan testCoverageRequest)
+		results = make(chan testCoverageResponse, len(tests))
+		errors = make(chan error)
 	)
 
-	for i, test := range tests {
-		config.statusWriter.Write([]byte(fmt.Sprintf("Computing coverage for %d of %d tests", i+1, len(tests))))
-		profiles, err := getTestProfiles(pkg, test, config.runner, config.testCoverageCache)
-		if err != nil {
-			return nil, nil, err
-		}
-		config.testCoverageCache.Write(cacheKeyForTest(pkg, test), profiles)
 
-		profilesByTest[test] = profiles
+	workerCount := 8
+	if len(tests) < workerCount {
+		workerCount = len(tests)
+	}
+
+	for i:=0;i < workerCount; i++ {
+		go testProfilesWorker(config, inputs, results, errors, &wg, &completedCoverageOps, len(tests))
+	}
+
+	for _, test := range tests {
+		inputs <- testCoverageRequest{pkg: pkg, test: test}
+		wg.Add(1)
+	}
+
+	close(inputs)
+	wg.Wait()
+	close(results)
+
+	select {
+	case err := <-errors:
+		return nil, nil, err
+	default:
+	}
+
+	for result := range results {
+		profilesByTest[result.test] = result.profiles
 	}
 
 	config.statusWriter.Write([]byte("Computing test ordering"))
@@ -218,24 +254,48 @@ func computeFileContentsByTest(config computationConfig) ([]string, []map[string
 	return sortedTests, out, nil
 }
 
-func getTestProfiles(pkg, test string, runner testRunner, testCache cache) ([]*cover.Profile, error) {
-	info := testCache.Read(cacheKeyForTest(pkg, test))
-	if info != nil {
-		val, ok := info.([]*cover.Profile)
-		if !ok {
-			return nil, fmt.Errorf("unexpected type in test cache: %#v", val)
+func testProfilesWorker(config computationConfig, inputs chan testCoverageRequest, results chan testCoverageResponse, errors chan<- error, wg *sync.WaitGroup, count *uint64, total int) {
+	for coverageRequest := range inputs {
+		pkg := coverageRequest.pkg
+		test := coverageRequest.test
+		resp := testCoverageResponse{
+			test: test,
 		}
 
-		if val != nil {
-			return val, nil
+		profiles, err := getTestProfiles(pkg, test, config.runner, config.testCoverageCache)
+		atomic.AddUint64(count, 1)
+		wg.Done()
+		config.statusWriter.Write([]byte(fmt.Sprintf("Computed coverage for %d of %d tests", *count, total)))
+
+		if err != nil {
+			errors <- err
+			return
 		}
+
+		resp.profiles = profiles
+		results <- resp
+	}
+}
+
+func getTestProfiles(pkg, test string, runner testRunner, testCache cache) ([]*cover.Profile, error)  {
+	info := testCache.Read(cacheKeyForTest(pkg, test))
+	if info != nil {
+	val, ok := info.([]*cover.Profile)
+	if !ok {
+	return nil, fmt.Errorf("unexpected type in test cache: %#v", val)
+	}
+
+	if val != nil {
+	return val, nil
+	}
 	}
 
 	profiles, err := runner.GetCoverage(pkg, test)
 	if err != nil {
-		return nil, err
+	return nil, err
 	}
 
+	testCache.Write(cacheKeyForTest(pkg, test), profiles)
 	return profiles, nil
 }
 
