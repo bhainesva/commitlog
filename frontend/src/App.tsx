@@ -155,8 +155,10 @@ export default function App() {
       setLoadingMessage('')
       setFiles(data.results.files.map((x: FileMap) => x.files));
     } else {
-      if (data.Error) {
+      if (data.error) {
         showErrorToast("Job failed!: " + data.error)
+        setLoadingMessage('')
+        setActivePkg('')
         console.error("Job failed!: ", data.error)
       } else {
         setLoadingMessage(data.details + '...')
